@@ -1,0 +1,76 @@
+Product ID: CERT_3Y_Q20
+
+English:
+Product Name: 3-Year 20% Quarterly Certificate
+Minimum & Multiple: 1,000 EGP
+Tenor (months): 36 months
+Interest Rate (annual): 0.2
+Payout Frequency: Quarterly
+Cannot be broken first X months: 6 months
+Loan Against Certificate: Allowed
+Maximum LTV: 0.8
+Loan Interest Rate During Certificate Life: Certificate rate + 2%
+Loan Interest Rate After Maturity: Current personal loan rate
+Credit Card Limit Against Certificate: Up to 90%
+Early Break Penalty:
+- 6–12 months: Deduct 60% of interest
+- 12–24 months: Deduct 40% of interest
+- 24–36 months: Deduct 20% of interest
+- after 36 months: Not applicable
+
+Arabic:
+اسم المنتج: شهادة 3 سنوات بعائد 20% ربع سنوي
+الحد الأدنى والمضاعفات: 1,000 جنيه
+المدة (بالشهور): 36 شهر
+سعر العائد السنوي: 0.2
+دورية الصرف: ربع سنوي
+لا يمكن الكسر خلال: 6 أشهر
+عقوبة الكسر من 6 إلى 12 شهر: خصم 60% من العائد
+عقوبة الكسر من 12 إلى 24 شهر: خصم 40% من العائد
+عقوبة الكسر من 24 إلى 36 شهر: خصم 20% من العائد
+عقوبة الكسر بعد 36 شهر: لا ينطبق
+قرض بضمان الشهادة: مسموح
+الحد الأقصى للتمويل: 0.8
+فائدة القرض أثناء مدة الشهادة: سعر الشهادة + 2%
+فائدة القرض بعد انتهاء الشهادة: سعر القرض الشخصي الساري
+حد بطاقة الائتمان بضمان الشهادة: حتى 90%
+
+--------------------------------------------------
+Product ID: CERT_5Y_Q18
+
+English:
+Product Name: 5-Year 18% Quarterly Certificate
+Minimum & Multiple: 1,000 EGP
+Tenor (months): 60 months
+Interest Rate (annual): 0.18
+Payout Frequency: Quarterly
+Cannot be broken first X months: 6 months
+Loan Against Certificate: Allowed
+Maximum LTV: 0.8
+Loan Interest Rate During Certificate Life: Certificate rate + 2%
+Loan Interest Rate After Maturity: Current personal loan rate
+Credit Card Limit Against Certificate: Up to 90%
+Early Break Penalty:
+- 6–12 months: Deduct 60% of interest
+- 12–24 months: Deduct 40% of interest
+- 24–36 months: Deduct 20% of interest
+- after 36 months: Deduct 10% of interest
+
+Arabic:
+اسم المنتج: شهادة 5 سنوات بعائد 18% ربع سنوي
+الحد الأدنى والمضاعفات: 1,000 جنيه
+المدة (بالشهور): 60 شهر
+سعر العائد السنوي: 0.18
+دورية الصرف: ربع سنوي
+لا يمكن الكسر خلال: 6 أشهر
+عقوبة الكسر من 6 إلى 12 شهر: خصم 60% من العائد
+عقوبة الكسر من 12 إلى 24 شهر: خصم 40% من العائد
+عقوبة الكسر من 24 إلى 36 شهر: خصم 20% من العائد
+عقوبة الكسر بعد 36 شهر: خصم 10% من العائد
+قرض بضمان الشهادة: مسموح
+الحد الأقصى للتمويل: 0.8
+فائدة القرض أثناء مدة الشهادة: سعر الشهادة + 2%
+فائدة القرض بعد انتهاء الشهادة: سعر القرض الشخصي الساري
+حد بطاقة الائتمان بضمان الشهادة: حتى 90%
+
+--------------------------------------------------
