@@ -1,0 +1,168 @@
+version: "3.9"
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - host-agent
+    environment:
+      - VITE_API_URL=http://host-agent:8000
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+
+  host-agent:
+    build:
+      context: .
+      dockerfile: backend/host_agent/Dockerfile
+    container_name: host-agent
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app/backend
+    depends_on:
+      - retail-agent
+    environment:
+      - PYTHONUNBUFFERED=1
+      - UVICORN_LOG_LEVEL=debug
+      - LOG_LEVEL=debug
+      - GOOGLE_API_KEY=${ORCHESTRATOR_GOOGLE_API_KEY}
+      - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production-min-32-chars
+      - JWT_EXPIRE_MINUTES=480
+      - FAQ_AGENT_URL=http://faq-agent:8001
+      - RETAIL_AGENT_URL=http://retail-agent:8002
+      - BANK_URL=http://bank-server:8006
+      - PORT=8000
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL}
+    command: >
+      python -m uvicorn backend.host_agent.server:app
+      --host 0.0.0.0
+      --port 8000
+      --reload
+      --log-level debug
+      --use-colors
+
+  faq-agent:
+    build:
+      context: .
+      dockerfile: backend/agents/faq_agent/Dockerfile
+    container_name: faq-agent
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./backend:/app/backend
+    environment:
+      - PYTHONUNBUFFERED=1
+      - UVICORN_LOG_LEVEL=debug
+      - LOG_LEVEL=debug
+      - GOOGLE_API_KEY=${SERVICES_GOOGLE_API_KEY}
+      - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production-min-32-chars
+      - JWT_EXPIRE_MINUTES=480
+      - VECTOR_DB_SERVICE_URL=http://vector-db-service:8004
+      - PORT=8001
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL}
+    command: >
+      python -m uvicorn backend.agents.faq_agent.server:faq_app
+      --host 0.0.0.0
+      --port 8001
+      --reload
+      --log-level debug
+      --use-colors
+
+  retail-agent:
+    build:
+      context: .
+      dockerfile: backend/agents/retail_agent/Dockerfile
+    container_name: retail-agent
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./backend:/app/backend
+    depends_on:
+      - bank-server
+    environment:
+      - PYTHONUNBUFFERED=1
+      - UVICORN_LOG_LEVEL=debug
+      - LOG_LEVEL=debug
+      - GOOGLE_API_KEY=${SERVICES_GOOGLE_API_KEY}
+      - BANK_URL=http://bank-server:8006
+      - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production-min-32-chars
+      - JWT_EXPIRE_MINUTES=480
+      - PORT=8002
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL}
+    command: >
+      python -m uvicorn backend.agents.retail_agent.server:retail_app
+      --host 0.0.0.0
+      --port 8002
+      --reload
+      --log-level debug
+      --use-colors
+
+  bank-server:
+    build:
+      context: .
+      dockerfile: backend/bank_server/Dockerfile
+    container_name: bank-server
+    ports:
+      - "8006:8006"
+    volumes:
+      - ./backend:/app/backend
+    environment:
+      - PYTHONUNBUFFERED=1
+      - UVICORN_LOG_LEVEL=debug
+      - LOG_LEVEL=debug
+      - GOOGLE_API_KEY=${SERVICES_GOOGLE_API_KEY}
+      - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production-min-32-chars
+      - JWT_EXPIRE_MINUTES=480
+      - PORT=8006
+    command: >
+      python -m uvicorn backend.bank_server.server:bank_app
+      --host 0.0.0.0
+      --port 8006
+      --reload
+      --log-level debug
+      --use-colors
+
+  vector-db-service:
+    build:
+      context: .
+      dockerfile: backend/vector_db_service/Dockerfile
+    container_name: vector-db-service
+    ports:
+      - "8004:8004"
+    volumes:
+      - ./backend:/app/backend
+    environment:
+      - PYTHONUNBUFFERED=1
+      - UVICORN_LOG_LEVEL=debug
+      - LOG_LEVEL=debug
+      - GOOGLE_API_KEY=${SERVICES_GOOGLE_API_KEY}
+      - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production-min-32-chars
+      - JWT_EXPIRE_MINUTES=480
+      - QDRANT_URL=https://2580c3f4-7869-40a8-b26b-3087029a69b1.europe-west3-0.gcp.cloud.qdrant.io:6333
+      - QDRANT_API_KEY=${QDRANT_API_KEY}
+      - PORT=8004
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL}
+    command: >
+      python -m uvicorn backend.vector_db_service.server:vector_db_app
+      --host 0.0.0.0
+      --port 8004
+      --reload
+      --log-level debug
+      --use-colors
+
+
