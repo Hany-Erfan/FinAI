@@ -5,6 +5,7 @@ uvicorn==0.38.0
 # Authentication & Security
 PyJWT==2.10.1
 python-multipart==0.0.20
+python-jose[cryptography]==3.5.0
 
 # Utilities
 requests==2.32.5

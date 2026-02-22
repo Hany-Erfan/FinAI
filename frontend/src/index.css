@@ -9,7 +9,7 @@
   --border-color: #E4E7EE;
   --shadow-color: rgba(92, 124, 255, 0.15);
 
-  --user-message-bg: var(--primary-gradient);
+  --user-message-bg: #5C7CFF;
   --user-message-text: white;
 
   --agent-message-bg: var(--card-background);
@@ -413,7 +413,6 @@ html,
 .message-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
   max-width: 85%;
   width: 100%;
 }
@@ -441,9 +440,6 @@ html,
   max-height: 260px;
   width: auto;
   height: auto;
-  border-radius: 10px;
-  margin-bottom: 8px;
-  border: 1px solid var(--border-color);
   background: var(--background-color);
 }
 
@@ -2064,4 +2060,86 @@ html,
 .logout-pill-btn:hover {
   filter: brightness(1.1);
   box-shadow: 0 6px 14px rgba(92, 124, 255, 0.3);
+}
+
+
+
+:root {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  color: #1c2733;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(160deg, #eef7ff, #ddeeff);
+}
+
+.page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+}
+
+.card {
+  width: min(420px, 100%);
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 12px 30px rgba(15, 35, 60, 0.12);
+  display: grid;
+  gap: 12px;
+}
+
+.card.wide {
+  width: min(700px, 100%);
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  font-weight: 600;
+}
+
+input {
+  border: 1px solid #c3d3e5;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 1rem;
+}
+
+button {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 600;
+  background: #1f6feb;
+  color: #fff;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.error {
+  color: #b2002a;
+  font-weight: 600;
+  margin: 0;
+}
+
+.admin-box {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
 }
