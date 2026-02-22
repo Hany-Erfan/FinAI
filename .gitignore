@@ -109,4 +109,3 @@ data/
 #frontend
 node_modules/
 .vite/
-.env
