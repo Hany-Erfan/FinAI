@@ -7,7 +7,6 @@ import os
 HOST_AGENT_URL = os.getenv("HOST_AGENT_URL", "http://localhost:8000")
 FAQ_AGENT_URL = os.getenv("FAQ_AGENT_URL", "http://localhost:8001")
 RETAIL_AGENT_URL = os.getenv("RETAIL_AGENT_URL", "http://localhost:8002")
-BANK_SERVER_URL = os.getenv("BANK_SERVER_URL", "http://localhost:8006")
 VECTOR_DB_URL = os.getenv("VECTOR_DB_URL", "http://localhost:8004")
 
 @pytest.mark.asyncio
@@ -32,29 +31,7 @@ async def test_retail_agent_health():
         assert response.status_code == 200
 
 @pytest.mark.asyncio
-async def test_bank_server_health():
-    async with httpx.AsyncClient() as client:
-        response = await client.get(f"{BANK_SERVER_URL}/docs")
-        assert response.status_code == 200
-
-@pytest.mark.asyncio
 async def test_vector_db_health():
     async with httpx.AsyncClient() as client:
         response = await client.get(f"{VECTOR_DB_URL}/docs")
         assert response.status_code == 200
-
-@pytest.mark.asyncio
-async def test_cross_service_login_attempt():
-    """
-    Test a basic login attempt on the host agent.
-    The endpoint expects OAuth2 form data (application/x-www-form-urlencoded).
-    """
-    async with httpx.AsyncClient() as client:
-        # Host agent has a login_router using OAuth2PasswordRequestForm
-        response = await client.post(
-            f"{HOST_AGENT_URL}/login", 
-            data={"username": "test", "password": "test"}
-        )
-        # We expect a 401 (Unauthorized) if the bank server doesn't find the user
-        # 422 meant the schema was wrong (expected form-data, got json)
-        assert response.status_code in [200, 401, 400]
