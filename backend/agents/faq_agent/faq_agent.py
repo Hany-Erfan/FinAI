@@ -1,20 +1,23 @@
 import os
+import logging
 from google.adk.agents import LlmAgent
 from google.adk.tools.mcp_tool.mcp_toolset import (
     MCPToolset,
     StdioServerParameters,
 )
 from backend.common.agent import Agent
-from backend.common.cache_dict import FAQAgentCache
+from backend.common.cache_dict import ProductAgentCache
+
+logger = logging.getLogger(__name__)
 
 
-def create_faq_agent(user_id: str) -> LlmAgent:
+def create_product_agent(user_id: str) -> LlmAgent:
     """Constructs the ADK agent."""
     return LlmAgent(
         model='gemini-3-flash-preview',
-        name='faq_agent',
-        description='A bilingual FAQ assistant that answers questions about banking products using RAG.',
-        instruction="""You are a specialized bilingual FAQ assistant. Your primary function is to answer user queries regarding banking products by strictly using the provided RAG tool to retrieve information.
+        name='product_agent',
+        description='A bilingual product assistant that answers questions about banking products using RAG.',
+        instruction="""You are a specialized bilingual product assistant. Your primary function is to answer user queries regarding banking products by strictly using the provided RAG tool to retrieve information.
 
         **Core Responsibilities:**
         1.  **Analyze the Query:** Understand the user's question and identify the specific product details they are looking for.
@@ -43,33 +46,33 @@ def create_faq_agent(user_id: str) -> LlmAgent:
     )
 
 
-class FAQAgent(Agent):
-    """FAQ banking agent with session and caching support."""
+class ProductAgent(Agent):
+    """Product banking agent with session and caching support."""
 
     def __init__(self, user_id: str):
         """Initialize the retail agent."""
         # Create the Google ADK agent
-        google_agent = create_faq_agent(user_id)
+        google_agent = create_product_agent(user_id)
         
         # Initialize base class
         super().__init__(
-            app_name='faq_agent',
+            app_name='product_agent',
             google_agent=google_agent,
         )
 
     @classmethod
-    def get_agent(cls, user_id: str) -> "FAQAgent":
-        """Return a cached or new FAQ agent instance.
+    def get_agent(cls, user_id: str) -> "ProductAgent":
+        """Return a cached or new Product agent instance.
 
         :param user_id: Cache key for the user
         :type user_id: str
-        :return: FAQAgent instance
-        :rtype: FAQAgent
+        :return: ProductAgent instance
+        :rtype: ProductAgent
         """
-        if user_id not in FAQAgentCache:
-            print(f"[FAQ] Creating new agent instance for user {user_id}")
-            FAQAgentCache[user_id] = cls(user_id)
+        if user_id not in ProductAgentCache:
+            logger.info(f"Creating new agent instance for user {user_id}")
+            ProductAgentCache[user_id] = cls(user_id)
         else:
-            print(f"[FAQ] Using cached agent instance for user {user_id}")
+            logger.info(f"Using cached agent instance for user {user_id}")
         
-        return FAQAgentCache[user_id]
+        return ProductAgentCache[user_id]

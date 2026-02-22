@@ -15,7 +15,7 @@ services:
       - host-agent
     environment:
       - VITE_API_URL=http://host-agent:8000
-    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+    command: [ "npm", "run", "dev", "--", "--host", "0.0.0.0" ]
 
   host-agent:
     build:
@@ -43,12 +43,7 @@ services:
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
       - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL}
     command: >
-      python -m uvicorn backend.host_agent.server:app
-      --host 0.0.0.0
-      --port 8000
-      --reload
-      --log-level debug
-      --use-colors
+      python -m uvicorn backend.host_agent.server:app --host 0.0.0.0 --port 8000 --reload --log-level debug --use-colors
 
   faq-agent:
     build:
@@ -72,12 +67,7 @@ services:
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
       - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL}
     command: >
-      python -m uvicorn backend.agents.faq_agent.server:faq_app
-      --host 0.0.0.0
-      --port 8001
-      --reload
-      --log-level debug
-      --use-colors
+      python -m uvicorn backend.agents.faq_agent.server:faq_app --host 0.0.0.0 --port 8001 --reload --log-level debug --use-colors
 
   retail-agent:
     build:
@@ -103,12 +93,7 @@ services:
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
       - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL}
     command: >
-      python -m uvicorn backend.agents.retail_agent.server:retail_app
-      --host 0.0.0.0
-      --port 8002
-      --reload
-      --log-level debug
-      --use-colors
+      python -m uvicorn backend.agents.retail_agent.server:retail_app --host 0.0.0.0 --port 8002 --reload --log-level debug --use-colors
 
   bank-server:
     build:
@@ -128,12 +113,16 @@ services:
       - JWT_EXPIRE_MINUTES=480
       - PORT=8006
     command: >
-      python -m uvicorn backend.bank_server.server:bank_app
-      --host 0.0.0.0
-      --port 8006
-      --reload
-      --log-level debug
-      --use-colors
+      python -m uvicorn backend.bank_server.server:bank_app --host 0.0.0.0 --port 8006 --reload --log-level debug --use-colors
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
 
   vector-db-service:
     build:
@@ -144,6 +133,8 @@ services:
       - "8004:8004"
     volumes:
       - ./backend:/app/backend
+    depends_on:
+      - qdrant
     environment:
       - PYTHONUNBUFFERED=1
       - UVICORN_LOG_LEVEL=debug
@@ -151,18 +142,15 @@ services:
       - GOOGLE_API_KEY=${SERVICES_GOOGLE_API_KEY}
       - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production-min-32-chars
       - JWT_EXPIRE_MINUTES=480
-      - QDRANT_URL=https://2580c3f4-7869-40a8-b26b-3087029a69b1.europe-west3-0.gcp.cloud.qdrant.io:6333
-      - QDRANT_API_KEY=${QDRANT_API_KEY}
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_API_KEY=
+      - VECTOR_DB_COLLECTION=sample_bank_products
       - PORT=8004
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
       - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL}
     command: >
-      python -m uvicorn backend.vector_db_service.server:vector_db_app
-      --host 0.0.0.0
-      --port 8004
-      --reload
-      --log-level debug
-      --use-colors
+      python -m uvicorn backend.vector_db_service.server:vector_db_app --host 0.0.0.0 --port 8004 --reload --log-level debug --use-colors
 
-
+volumes:
+  qdrant_data:

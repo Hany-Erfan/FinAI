@@ -1,15 +1,28 @@
 from google import genai
+import uuid
+import hashlib
 from qdrant_client import QdrantClient, models
 from google.genai import types
 from qdrant_client.models import Distance
 import os
 import pandas as pd
+import logging
 
-QDRANT_URL = os.getenv("QDRANT_URL", "https://2580c3f4-7869-40a8-b26b-3087029a69b1.europe-west3-0.gcp.cloud.qdrant.io:6333")
-QDRANT_API_KEY = os.getenv("QDRANT_API_KEY","***REMOVED***")
+logger = logging.getLogger(__name__)
+
+# Constants
+QDRANT_URL = os.getenv("QDRANT_URL", "http://qdrant:6333")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY") or None
+DEFAULT_COLLECTION = os.getenv("VECTOR_DB_COLLECTION", "sample_bank_products")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+
+if not GOOGLE_API_KEY:
+    raise ValueError("GOOGLE_API_KEY environment variable is not set. Please set it in your .env file.")
 
 qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
-google_client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY","***REMOVED***")) 
+google_client = genai.Client(api_key=GOOGLE_API_KEY)
+
 
 
 def get_collections():
@@ -22,83 +35,120 @@ def get_collections():
     try:
         return qdrant_client.get_collections()
     except Exception as e:
-        print(f"Warning: Could not connect to Qdrant: {e}")
+        logger.warning(f"Could not connect to Qdrant: {e}")
         return []
 
 def read_products_xlsx_and_chunk(file_path: str):
     """
-    Reads banking product data from an Excel file and converts it into structured text chunks.
-
-    :param file_path: The absolute or relative path to the Excel (.xlsx) file.
-    :type file_path: str
-    :return: A list of formatted text strings, one for each product found in the file, or None if reading fails.
-    :rtype: list[str] | None
+    Reads banking product data from a multi-sheet Excel file and converts it into structured text chunks.
+    Treats each sheet as a category.
     """
     try:
-        df = pd.read_excel(file_path)
+        xl = pd.ExcelFile(file_path)
     except Exception as e:
-        print(f"Error reading Excel file: {e}")
+        logger.error(f"Error reading Excel file {file_path}: {e}")
         return None
 
-    products_text = []
+    products_data = []
 
-    # Iterate over product columns (English, Arabic pairs) starting from column C (index 2)
-    # We step by 2: (Eng_Col, Ar_Col), (Eng_Col, Ar_Col)...
-    for i in range(2, len(df.columns), 2):
-        if i + 1 >= len(df.columns):
-            break
-
-        # Check if we have a valid product ID at row 0
-        product_id = df.iloc[0, i]
-        if pd.isna(product_id):
-            continue
-
-        chunk = f"Product ID: {product_id}\n\n"
-
-        # --- English Section ---
-        chunk += "English:\n"
-        early_break_lines = []
-
-        # Start from row 1 (since row 0 is Product ID)
-        for idx in range(1, len(df)):
-            field_name = df.iloc[idx, 0] # Column A: Field (English)
-            value = df.iloc[idx, i]      # Column i: Product Value (English)
-
-            if pd.isna(value) or pd.isna(field_name):
-                continue
-            
-            field_name = str(field_name).strip()
-            value = str(value).strip()
-
-            if "Early Break Penalty" in field_name:
-                # Format: "Early Break Penalty (6-12 months)" -> "6-12 months"
-                duration = field_name.replace("Early Break Penalty", "").strip(" ()")
-                early_break_lines.append(f"- {duration}: {value}")
-            else:
-                chunk += f"{field_name}: {value}\n"
+    for sheet_name in xl.sheet_names:
+        category = sheet_name.strip()
+        df = xl.parse(sheet_name, header=None)
         
-        # Append grouped Early Break Penalty lines if any
-        if early_break_lines:
-            chunk += "Early Break Penalty:\n"
-            chunk += "\n".join(early_break_lines) + "\n"
+        # 1. Find anchors for English and Arabic sections
+        eng_anchors = []
+        ara_anchors = []
+        max_header_row = -1
+        
+        # Check first 5 rows for markers (was 2)
+        for r_idx in range(min(5, len(df))):
+            row = df.iloc[r_idx]
+            found_header = False
+            for c_idx, val in enumerate(row):
+                if pd.isna(val): continue
+                val_str = str(val).strip().upper()
+                if any(k in val_str for k in ["UXW FINAL COPY", "ENGLISH", "EN_QUESTION", "ENGLISH QUESTION"]):
+                    eng_anchors.append(c_idx)
+                    found_header = True
+                elif any(k in val_str for k in ["ARABIC", "AR_QUESTION", "ARABIC QUESTION", "ARABIC COPY"]):
+                    ara_anchors.append(c_idx)
+                    found_header = True
+            if found_header:
+                max_header_row = r_idx
+        
+        # Unique and sorted
+        eng_anchors = sorted(list(set(eng_anchors)))
+        ara_anchors = sorted(list(set(ara_anchors)))
+        
+        # Fallbacks if none found
+        if not eng_anchors: 
+            eng_anchors = [0]
+        if not ara_anchors: 
+            ara_anchors = [4] if len(df.columns) > 4 else [min(1, len(df.columns)-1)]
 
-        # --- Arabic Section ---
-        chunk += "\nArabic:\n"
-        for idx in range(1, len(df)):
-            field_name = df.iloc[idx, 1] # Column B: Field (Arabic)
-            value = df.iloc[idx, i+1]    # Column i+1: Product Value (Arabic)
+        eng_start = eng_anchors[0]
+        ara_start = ara_anchors[0]
 
-            if pd.isna(value) or pd.isna(field_name):
-                continue
-
-            field_name = str(field_name).strip()
-            value = str(value).strip()
+        # 2. Iterate rows and extract Q&A
+        # Start from the row AFTER the last found header row
+        start_row = max_header_row + 1
+        
+        for r_idx in range(start_row, len(df)):
+            row = df.iloc[r_idx]
             
-            chunk += f"{field_name}: {value}\n"
+            # Helper to find Q&A pair starting from a column
+            def find_qa_pair(start_col):
+                # Try start_col, start_col+1, start_col+2 to find a question
+                # returns (question, answer) or (None, None)
+                for i in range(start_col, min(start_col + 5, len(df.columns) - 1)):
+                    q = str(row[i]).strip() if not pd.isna(row[i]) else ""
+                    a = str(row[i+1]).strip() if not pd.isna(row[i+1]) else ""
+                    
+                    if not q or not a: continue
 
-        products_text.append(chunk)
+                    # Heuristic for a question: ends with ? or contains specific keywords, and has an answer
+                    # Or just long enough strings that look like Q&A
+                    is_q = q.endswith('?') or q.endswith('؟') or (len(q) > 15)
+                    is_a = len(a) > 5
+                    
+                    if is_q and is_a:
+                        # Ensure we don't pick up headers
+                        if q.upper() not in ["ENGLISH", "ARABIC", "UXW FINAL COPY", "QUESTION", "ANSWER", "CATEGORY"]:
+                            return q, a
+                return None, None
 
-    return products_text
+            e_q, e_a = find_qa_pair(eng_start)
+            a_q, a_a = find_qa_pair(ara_start)
+
+            if e_q and e_a:
+                # Use a deterministic ID based on the English question
+                product_id = hashlib.md5(e_q.lower().strip().encode()).hexdigest()
+                
+                chunk = f"Category: {category}\n\n"
+                chunk += f"English Question: {e_q}\n"
+                chunk += f"English Answer: {e_a}\n"
+                
+                payload = {
+                    "category": category,
+                    "question_en": e_q,
+                    "answer_en": e_a,
+                }
+                
+                if a_q and a_a:
+                    chunk += f"\nArabic Question: {a_q}\n"
+                    chunk += f"Arabic Answer: {a_a}\n"
+                    payload.update({
+                        "question_ar": a_q,
+                        "answer_ar": a_a,
+                    })
+                
+                products_data.append({
+                    "id": product_id, 
+                    "text": chunk,
+                    "payload": payload
+                })
+
+    return products_data if products_data else None
 
 def create_collections(collection_name):
     """
@@ -114,6 +164,7 @@ def create_collections(collection_name):
 def generate_embeddings(content, task_type='RETRIEVAL_DOCUMENT'):
     """
     Generates vector embeddings for a list of contents using the Gemini embedding model.
+    Processes content in batches to avoid timeouts and API limits.
 
     :param content: A list of text strings to embed.
     :type content: list[str]
@@ -123,35 +174,178 @@ def generate_embeddings(content, task_type='RETRIEVAL_DOCUMENT'):
     :rtype: list[list[float]]
     """
     model = "gemini-embedding-001"
-    response = google_client.models.embed_content(
-        model=model,
-        contents=content,
-        config=types.EmbedContentConfig(task_type=task_type)
-    )
-    
-    return [e.values for e in response.embeddings]
+    batch_size = 100
+    all_embeddings = []
 
-def store_embeddings(text_embeddings_pairs, collection_name):
+    for i in range(0, len(content), batch_size):
+        batch = content[i : i + batch_size]
+        response = google_client.models.embed_content(
+            model=model,
+            contents=batch,
+            config=types.EmbedContentConfig(task_type=task_type)
+        )
+        all_embeddings.extend([e.values for e in response.embeddings])
+    
+    return all_embeddings
+
+def store_embeddings(product_embeddings_data, collection_name):
     """
     Upserts text-embedding pairs into a specified Qdrant collection.
 
-    :param text_embeddings_pairs: A list of tuples, each containing (text_content, vector_embedding).
-    :type text_embeddings_pairs: list[tuple[str, list[float]]]
+    :param product_embeddings_data: A list of dicts containing 'id', 'text', 'embedding'.
+    :type product_embeddings_data: list[dict]
     :param collection_name: The target Qdrant collection name.
     :type collection_name: str
     :return: None
     :rtype: None
     """
-    points = []
-    for i, doc in enumerate(text_embeddings_pairs):
-        points.append(
+    if not qdrant_client.collection_exists(collection_name):
+        create_collections(collection_name)
+
+    all_points = []
+    for doc in product_embeddings_data:
+        raw_chunk_id = str(doc.get("chunk_id", doc.get("id")))
+        product_id = str(doc.get("product_id", doc.get("id")))
+        point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, raw_chunk_id))
+        
+        # Build comprehensive payload
+        payload = {
+            "text": doc["text"],
+            "product_id": product_id
+        }
+        # Add any additional fields from doc['payload'] if present
+        if "payload" in doc and isinstance(doc["payload"], dict):
+            payload.update(doc["payload"])
+
+        all_points.append(
             models.PointStruct(
-                id=i,
-                vector=doc[1],
-                payload={"text": doc[0]}
+                id=point_id,
+                vector=doc["embedding"],
+                payload=payload
             )
         )
-    qdrant_client.upsert(collection_name, points)
+    
+    # Batch upsert
+    batch_size = 100
+    for i in range(0, len(all_points), batch_size):
+        batch_points = all_points[i : i + batch_size]
+        qdrant_client.upsert(collection_name, batch_points)
+
+def upsert_product(product_data: dict, collection_name: str) -> bool:
+    """
+    Upserts a single product into Qdrant.
+    product_data must contain: question_en, answer_en, question_ar, answer_ar, category
+    """
+    try:
+        e_q = product_data.get("question_en", "")
+        e_a = product_data.get("answer_en", "")
+        a_q = product_data.get("question_ar", "")
+        a_a = product_data.get("answer_ar", "")
+        category = product_data.get("category", "General")
+
+        if not e_q or not e_a:
+            return False
+
+        # Generate the text chunk for RAG
+        chunk = f"Category: {category}\n\n"
+        chunk += f"English Question: {e_q}\n"
+        chunk += f"English Answer: {e_a}\n"
+        if a_q and a_a:
+            chunk += f"\nArabic Question: {a_q}\n"
+            chunk += f"Arabic Answer: {a_a}\n"
+
+        # Generate deterministic point ID
+        product_hash = hashlib.md5(e_q.lower().strip().encode()).hexdigest()
+        point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, product_hash))
+
+        # Generate embedding
+        embedding = generate_embeddings([chunk], task_type='RETRIEVAL_DOCUMENT')[0]
+
+        # Payload
+        payload = {
+            "text": chunk,
+            "product_id": product_hash,
+            "category": category,
+            "question_en": e_q,
+            "answer_en": e_a,
+            "question_ar": a_q,
+            "answer_ar": a_a
+        }
+
+        if not qdrant_client.collection_exists(collection_name):
+            create_collections(collection_name)
+
+        qdrant_client.upsert(
+            collection_name=collection_name,
+            points=[
+                models.PointStruct(
+                    id=point_id,
+                    vector=embedding,
+                    payload=payload
+                )
+            ]
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Error upserting product: {e}", exc_info=True)
+        return False
+
+def delete_product(product_id: str, collection_name: str):
+    logger.info(f"Deleting product {product_id} from {collection_name}")
+    try:
+        qdrant_client.delete(
+            collection_name=collection_name,
+            points_selector=models.FilterSelector(
+                filter=models.Filter(
+                    must=[
+                        models.FieldCondition(
+                            key="product_id",
+                            match=models.MatchValue(value=str(product_id)),
+                        ),
+                    ],
+                )
+            ),
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Error deleting product {product_id}: {e}")
+        return False
+
+def delete_all_products(collection_name: str) -> bool:
+    try:
+        if not qdrant_client.collection_exists(collection_name):
+            return True
+        qdrant_client.delete(
+            collection_name=collection_name,
+            points_selector=models.FilterSelector(
+                filter=models.Filter(), # Empty filter matches everything
+            ),
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Error deleting all products from {collection_name}: {e}")
+        return False
+
+def get_all_product_ids(collection_name: str) -> list[dict]:
+    try:
+        if not qdrant_client.collection_exists(collection_name):
+            return []
+            
+        records, next_page = qdrant_client.scroll(
+            collection_name=collection_name,
+            limit=10000,
+            with_payload=True,
+            with_vectors=False
+        )
+        products = []
+        for record in records:
+            p_payload = record.payload
+            if p_payload:
+                products.append(p_payload)
+        return products
+    except Exception as e:
+        logger.error(f"Error getting products from {collection_name}: {e}")
+        return []
 
 def retrieve_documents(query, collection_name, top_k=1):
     """
@@ -166,7 +360,7 @@ def retrieve_documents(query, collection_name, top_k=1):
     :return: A formatted string containing the retrieved content and its relevance score, or an error message.
     :rtype: str
     """
-    print(f"[VECTOR-DB-SERVICE] Searching Qdrant: collection={collection_name}, query='{query}'")
+    logger.info(f"Searching Qdrant: collection={collection_name}, query='{query}'")
     try:
         query_embedding = generate_embeddings([query], task_type='RETRIEVAL_QUERY')
         query_embedding = query_embedding[0]
@@ -179,7 +373,7 @@ def retrieve_documents(query, collection_name, top_k=1):
             with_payload=True
         )
         
-        print(f"[VECTOR-DB-SERVICE] Qdrant raw results: {results}")
+        logger.debug(f"Qdrant raw results: {results}")
         
         # Extract the text and score for the LLM
         extracted_results = []
@@ -190,56 +384,24 @@ def retrieve_documents(query, collection_name, top_k=1):
                 extracted_results.append(f"Score: {score:.4f}\nContent: {text}")
         
         if not extracted_results:
-            print("[VECTOR-DB-SERVICE] Warning: No documents found in Qdrant.")
+            logger.warning("No documents found in Qdrant.")
             return "No relevant banking product information found for this query."
             
         final_output = "\n\n---\n\n".join(extracted_results)
-        print(f"[VECTOR-DB-SERVICE] Returning to Agent: {final_output[:200]}...")
+        logger.info(f"Returning {len(extracted_results)} results to Agent")
         return final_output
         
     except Exception as e:
-        print(f"[VECTOR-DB-SERVICE] Error in retrieve_documents: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Error in retrieve_documents: {str(e)}", exc_info=True)
         return f"Error searching product database: {str(e)}"
 
 if __name__ == "__main__":
-    # Get the directory of the current file to locate the Excel file reliably
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    xlsx_file = os.path.join(current_dir, "Bilingual_Certificate_Products.xlsx")
-    
-    if os.path.exists(xlsx_file):
-        print(f"Reading file: {xlsx_file}")
-        products = read_products_xlsx_and_chunk(xlsx_file)
-        if products:
-            print(f"\nFound {len(products)} products.")
-        else:
-             print("No products found or error reading file.")
-    else:
-        print(f"File not found: {xlsx_file}")
-
-    # Create collections
-    print("Creating collections...")
     # create_collections("sample_bank_products")
-    print("Collections created successfully")
     print(get_collections())
-
-    print("\nGenerating embeddings...")
-    # products_embeddings = generate_embeddings(products, task_type='RETRIEVAL_DOCUMENT')
-    print("Embeddings generated successfully")
-
-    #creating text-embedding pairs
-    # text_embeddings_pairs = list(zip(products, products_embeddings))
-    print("\nStoring embeddings...")
-    # store_embeddings(text_embeddings_pairs, "sample_bank_products")
-    print("Embeddings stored successfully")
-
+    
     query = "what is the payout frequency of 3 year certificate?"
-
-    print("\nRetrieving documents...")
     results = retrieve_documents(query, "sample_bank_products")
     print(results)
-
-    print("\nDocuments retrieved successfully")
 
     

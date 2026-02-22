@@ -1,20 +1,18 @@
 import uvicorn
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.vector_db_service.routes.vector_db_health import vector_db_health_router
 from backend.vector_db_service.routes.retreive_product import retreive_product_router
-# from backend.common.observability import get_langfuse_client, instrument_google_adk
-
-# langfuse = get_langfuse_client()
-# instrument_google_adk()
+from backend.vector_db_service.routes.manage_documents import manage_documents_router
 
 vector_db_app = FastAPI(
     title="Vector DB Service",
-    description="A service for RAG",
-    version="1.0.0",
+    description="A service for Product RAG",
+    version="0.1.0",
 )
 
-# CORS middleware
+# Add CORS middleware to allow cross-origin requests
 vector_db_app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -23,15 +21,19 @@ vector_db_app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include Routers
 routers = [
     vector_db_health_router,
     retreive_product_router,
+    manage_documents_router,
 ]
 
 for router in routers:
     vector_db_app.include_router(router)
 
 if __name__ == "__main__":
+    host = os.getenv("VECTOR_DB_HOST", "0.0.0.0")
+    port = int(os.getenv("VECTOR_DB_PORT", "8004"))
     uvicorn.run(
-        "backend.vector_db_service.server:vector_db_app", host="0.0.0.0", port=8004, reload=True
+        "backend.vector_db_service.server:vector_db_app", host=host, port=port, reload=True
     )

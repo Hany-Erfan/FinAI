@@ -16,7 +16,7 @@ from a2a.types import (
 )
 from a2a.utils.errors import ServerError
 from google.genai import types
-from backend.agents.faq_agent.faq_agent import FAQAgent
+from backend.agents.faq_agent.faq_agent import ProductAgent
 
 
 logger = logging.getLogger(__name__)
@@ -69,7 +69,7 @@ class FAQExecutor(AgentExecutor):
     ) -> None:
         """Process request using cached FAQAgent instance."""
         # Get cached FAQ agent for this user
-        faq_agent = FAQAgent.get_agent(user_id=user_id)
+        faq_agent = ProductAgent.get_agent(user_id=user_id)
         
         session_state = self._prepare_session_state(
             jwt_token, user_id

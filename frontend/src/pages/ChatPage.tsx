@@ -4,6 +4,7 @@ import { Endpoints } from '../api/endpoints';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useAuth } from '../AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 interface Message {
   text: string;
@@ -37,6 +38,7 @@ const AgentIcon = () => (
 );
 
 const ChatPage: React.FC = () => {
+  const navigate = useNavigate();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [input, setInput] = useState('');
@@ -349,7 +351,10 @@ const ChatPage: React.FC = () => {
           <span className="new-chat-icon">+</span>
           <span className="new-chat-label">New Chat</span>
         </button>
-        <div className="chat-history">
+        <button className="new-chat-btn" onClick={() => navigate('/backoffice')} style={{ marginTop: '0.5rem', backgroundColor: '#3a3b40' }}>
+          <span className="new-chat-label">Document Backoffice</span>
+        </button>
+        <div className="chat-history" style={{ marginTop: '1rem' }}>
           {sessions.map(session => (
             <div
               key={session.id}

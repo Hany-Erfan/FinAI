@@ -39,4 +39,4 @@ class ThreadSafeDict(dict):
             return super().setdefault(key, default)
 
 RetailAgentCache: ThreadSafeDict = ThreadSafeDict()
-FAQAgentCache: ThreadSafeDict = ThreadSafeDict()
+ProductAgentCache: ThreadSafeDict = ThreadSafeDict()
