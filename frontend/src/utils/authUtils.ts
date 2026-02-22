@@ -1,3 +1,4 @@
+const CSRF_COOKIE_PREFIX = "chat_csrf_token";
 
 export function getCookie(name) {
   const cookieValue = `; ${document.cookie}`;
