@@ -351,7 +351,16 @@ const ChatPage: React.FC = () => {
           <span className="new-chat-icon">+</span>
           <span className="new-chat-label">New Chat</span>
         </button>
-        <button className="new-chat-btn" onClick={() => navigate('/backoffice')} style={{ marginTop: '0.5rem', backgroundColor: '#3a3b40' }}>
+        <button className="new-chat-btn" onClick={() => navigate('/backoffice')}>
+          <span className="new-chat-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <line x1="10" y1="9" x2="8" y2="9"></line>
+            </svg>
+          </span>
           <span className="new-chat-label">Document Backoffice</span>
         </button>
         <div className="chat-history" style={{ marginTop: '1rem' }}>

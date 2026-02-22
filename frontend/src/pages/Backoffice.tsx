@@ -1,4 +1,4 @@
-import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
+import React, { useState, useEffect, ChangeEvent, FormEvent, useRef } from 'react';
 import axios from 'axios';
 import { Endpoints } from '../api/endpoints';
 import { useNavigate } from 'react-router-dom';
@@ -28,6 +28,7 @@ export default function Backoffice() {
     });
 
     const navigate = useNavigate();
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         fetchProducts();
@@ -64,6 +65,9 @@ export default function Backoffice() {
             if (res.data.success) {
                 setMessage('Success: ' + res.data.message);
                 setFile(null);
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = '';
+                }
                 fetchProducts();
             } else {
                 setMessage('Error: ' + (res.data.message || res.data.error || 'Upload failed'));
@@ -155,7 +159,7 @@ export default function Backoffice() {
             <section className="section-card">
                 <h3>Bulk Ingest (Excel)</h3>
                 <div className="upload-controls">
-                    <input type="file" accept=".xlsx,.xls" onChange={handleFileChange} />
+                    <input type="file" accept=".xlsx,.xls" onChange={handleFileChange} ref={fileInputRef} />
                     <button onClick={handleUpload} disabled={!file || loading} className="btn btn-primary">
                         {loading ? 'Uploading...' : 'Ingest File'}
                     </button>
