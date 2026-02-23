@@ -97,7 +97,7 @@ const ChatPage= ({ auth, onLogout, sessionId }) => {
     setIsLoading(true);
 
     try {
-      const response = await sendChatMessage(input, currentSessionId)
+      const response = await sendChatMessage(input, currentSessionId);
 
       const agentMessage: Message = { text: response.data.response, sender: 'agent', timestamp: new Date().toISOString() };
       const finalSessions = updatedSessions.map(s =>
@@ -134,11 +134,11 @@ const ChatPage= ({ auth, onLogout, sessionId }) => {
 
   const handleAdminCheck = async () => {
     try {
-      const result = await showAdminManagement(sessionId);
+      await showAdminManagement(sessionId);
     } catch (err) {
       console.error('Error checking admin:', err);
     }
-  }
+  };
 
   const activeMessages = getActiveSession()?.messages || [];
 

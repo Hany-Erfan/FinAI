@@ -50,7 +50,7 @@ export default function App() {
       role: profile.role,
       username: profile.username,
     });
-  }
+  };
 
   const handleLogout = useCallback(async () => {
     try {

@@ -22,7 +22,6 @@ from backend.bank_server.utils.security_deps import auth_cookie_name, csrf_cooki
 from backend.bank_server.utils.user_store import get_user_by_username
 from backend.common.pass_auth import verify_password
 import backend.host_agent.routing_agent as routing_agent_module
-
 from observability import get_logger, setup_telemetry, instrument_app, setup_logging
 
 logger = get_logger(__name__)
