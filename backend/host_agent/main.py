@@ -21,6 +21,15 @@ from google.genai import types
 
 from backend.host_agent.routing_agent import get_root_agent_async, AuthRequiredError
 from backend.common.jwt_auth import create_access_token, verify_token
+from observability import get_logger, setup_telemetry, instrument_app, setup_logging
+
+logger = get_logger(__name__)
+
+# Initialize OpenTelemetry tracing (reads from OTEL_* environment variables)
+setup_telemetry()
+
+# Initialize centralized logging (reads from LOG_* environment variables)
+setup_logging()
 
 
 # =========================
@@ -40,6 +49,7 @@ app = FastAPI(
     description="HTTP bridge to A2A host agent",
     version="1.0.0",
 )
+instrument_app(app)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

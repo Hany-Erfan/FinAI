@@ -4,6 +4,7 @@ import os
 import uuid
 
 from typing import Any
+import asyncio
 
 import httpx
 
@@ -18,31 +19,33 @@ from a2a.types import (
     Task,
     TaskState,
 )
+from dotenv import load_dotenv
 from google.adk import Agent
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.tools.tool_context import ToolContext
+from google.adk.sessions.state import State
 from backend.host_agent.remote_agent_connection import (
     RemoteAgentConnections,
     TaskUpdateCallback,
 )
+from observability import get_tracer, get_logger
+from opentelemetry import trace
 
+logger = get_logger(__name__)
 
-REQUEST_TIMEOUT = 120.0
+load_dotenv()
 
-
-
-class AuthRequiredError(Exception):
-    """Raised when authentication is required for a guest user."""
-    pass
+# Get tracer for instrumentation
+tracer = get_tracer(__name__)
 
 
 def convert_part(part: Part, tool_context: ToolContext):
     """Convert a part to text. Only text parts are supported."""
-    if part.type == 'text':
+    if part.type == "text":
         return part.text
 
-    return f'Unknown type: {part.type}'
+    return f"Unknown type: {part.type}"
 
 
 def convert_parts(parts: list[Part], tool_context: ToolContext):
@@ -54,23 +57,27 @@ def convert_parts(parts: list[Part], tool_context: ToolContext):
 
 
 def create_send_message_payload(
-    text: str, task_id: str | None = None, context_id: str | None = None
+        text: str, task_id: str | None = None, context_id: str | None = None
 ) -> dict[str, Any]:
     """Helper function to create the payload for sending a task."""
     payload: dict[str, Any] = {
-        'message': {
-            'role': 'user',
-            'parts': [{'type': 'text', 'text': text}],
-            'messageId': uuid.uuid4().hex,
+        "message": {
+            "role": "user",
+            "parts": [{"type": "text", "text": text}],
+            "messageId": uuid.uuid4().hex,
         },
     }
 
     if task_id:
-        payload['message']['taskId'] = task_id
+        payload["message"]["taskId"] = task_id
 
     if context_id:
-        payload['message']['contextId'] = context_id
+        payload["message"]["contextId"] = context_id
     return payload
+
+
+REQUEST_TIMEOUT = 120.0
+
 
 class RoutingAgent:
     """The Routing agent.
@@ -80,8 +87,8 @@ class RoutingAgent:
     """
 
     def __init__(
-        self,
-        task_callback: TaskUpdateCallback | None = None,
+            self,
+            task_callback: TaskUpdateCallback | None = None,
     ):
         """Initializes the RoutingAgent.
 
@@ -91,11 +98,9 @@ class RoutingAgent:
         self.task_callback = task_callback
         self.remote_agent_connections: dict[str, RemoteAgentConnections] = {}
         self.cards: dict[str, AgentCard] = {}
-        self.agents: str = ''
+        self.agents: str = ""
 
-    async def _async_init_components(
-        self, remote_agent_addresses: list[str]
-    ) -> None:
+    async def _async_init_components(self, remote_agent_addresses: list[str]) -> None:
         """Asynchronously initializes the components of the RoutingAgent.
 
         :param remote_agent_addresses: A list of remote agent addresses.
@@ -104,40 +109,59 @@ class RoutingAgent:
         # Use a single httpx.AsyncClient for all card resolutions for efficiency
         async with httpx.AsyncClient(timeout=30) as client:
             for address in remote_agent_addresses:
-                card_resolver = A2ACardResolver(
-                    client, address
-                )  # Constructor is sync
-                try:
-                    card = (
-                        await card_resolver.get_agent_card()
-                    )  # get_agent_card is async
+                card_resolver = A2ACardResolver(client, address)  # Constructor is sync
 
-                    remote_connection = RemoteAgentConnections(
-                        agent_card=card, agent_url=address
-                    )
-                    self.remote_agent_connections[card.name] = remote_connection
-                    self.cards[card.name] = card
-                except httpx.ConnectError as e:
-                    print(
-                        f'ERROR: Failed to get agent card from {address}: {e}'
-                    )
-                except Exception as e:  # Catch other potential errors
-                    print(
-                        f'ERROR: Failed to initialize connection for {address}: {e}'
-                    )
+                # Retry logic for agent card fetching
+                max_retries = 200
+                retry_delay = 3  # seconds
+
+                for attempt in range(max_retries):
+                    try:
+                        card = (
+                            await card_resolver.get_agent_card()
+                        )  # get_agent_card is async
+
+                        remote_connection = RemoteAgentConnections(
+                            agent_card=card, agent_url=address
+                        )
+                        self.remote_agent_connections[card.name] = remote_connection
+                        self.cards[card.name] = card
+                        logger.debug(f"Successfully connected to {card.name} at {address}")
+                        break  # Success, exit retry loop
+
+                    except httpx.ConnectError as e:
+                        if attempt < max_retries - 1:
+                            logger.info(
+                                f"Waiting for {address} to be ready... (attempt {attempt + 1}/{max_retries})"
+                            )
+                            await asyncio.sleep(retry_delay)
+                        else:
+                            logger.debug(
+                f"ERROR: Failed to connect to {address} after {max_retries} attempts: {e}"
+            )
+                    except Exception as e:  # Catch other potential errors
+                        if attempt < max_retries - 1:
+                            logger.info(
+                                f"Retrying connection to {address}... (attempt {attempt + 1}/{max_retries})"
+                            )
+                            await asyncio.sleep(retry_delay)
+                        else:
+                            logger.debug(
+                f"ERROR: Failed to initialize {address} after {max_retries} attempts: {e}"
+            )
 
         # Populate self.agents using the logic from original __init__ (via list_remote_agents)
         agent_info = []
         for agent_detail_dict in self.list_remote_agents():
             agent_info.append(json.dumps(agent_detail_dict))
-        self.agents = '\n'.join(agent_info)
+        self.agents = "\n".join(agent_info)
 
     @classmethod
     async def create(
-        cls,
-        remote_agent_addresses: list[str],
-        task_callback: TaskUpdateCallback | None = None,
-    ) -> 'RoutingAgent':
+            cls,
+            remote_agent_addresses: list[str],
+            task_callback: TaskUpdateCallback | None = None,
+    ) -> "RoutingAgent":
         """Creates and asynchronously initializes an instance of the RoutingAgent.
 
         :param remote_agent_addresses: A list of remote agent addresses.
@@ -158,12 +182,12 @@ class RoutingAgent:
         :rtype: Agent
         """
         return Agent(
-            model='gemini-3-flash-preview',
-            name='Routing_agent',
+            model=os.getenv("HOST_AGENT_MODEL_ID", "gemini-3-flash-preview"),
+            name="Routing_agent",
             instruction=self.root_instruction,
             before_model_callback=self.before_model_callback,
             description=(
-                'This Routing agent orchestrates the decomposition of the user asking for Bank products'
+                "This Routing agent orchestrates the decomposition of the user asking for banking products, FAQ assistance, and retail interactions."
             ),
             tools=[
                 self.send_message,
@@ -180,54 +204,71 @@ class RoutingAgent:
         """
         current_agent = self.check_active_agent(context)
         return f"""
-        **Role:** You are an expert Routing/Orchestrator Delegator. Your primary function is to accurately delegate user inquiries regarding retail banking services and product information to the appropriate specialized remote agent (Retail Agent or FAQ Agent).
+     **Role:** You are an expert Routing/Orchestrator Delegator. Your primary function is to accurately delegate user inquiries regarding banking products, branch information, FAQ assistance, and retail services to the appropriate specialized remote agents.
 
         **Core Directives:**
-
-        * **FAQ Agent Routing:**
-        - **When to Engage:** Route to FAQ Agent for general inquiries about banking products, frequently asked questions, and product specifications that do NOT require user account access.
-        - **Key Capabilities:** 
-          - Expert in bilingual (English/Arabic) product details (e.g., Certificates, Loans).
-          - Answers questions about interest rates, payout frequencies, and penalties.
-          - Does not require a User ID (suitable for guests).
-        
-        * **Retail Agent Routing:**
-        - **When to Engage:** Route to Retail Agent ONLY for user-specific banking queries including:
-          - Account balance inquiries
-          - Account information and details
-          - Transaction history and statements
-        - **Key Capabilities:** 
-          - Retrieves real-time account balances and available funds
-          - Provides detailed account information
-          - Fetches transaction history with customizable limits
-        
-        * **Talk to the user directly:** Do not delegate user queries like hello or any questions that you can directly answer yourself to the remote agents.
         * **Task Delegation:** Utilize the `send_message` function to assign actionable tasks to remote agents.
-        * **Response Format:** If the response from the remote agent is in markdown format, show it to the user as it is, if not, format it in markdown.
         * **Contextual Awareness for Remote Agents:** If a remote agent repeatedly requests user confirmation, assume it lacks access to the full conversation history. In such cases, enrich the task description with all necessary contextual information relevant to that specific agent.
-        * **Autonomous Agent Engagement:** Never seek user permission before engaging with remote agents. If multiple agents are required to fulfill a request, connect with them directly without requesting user preference or confirmation.
+
+        * **CRITICAL - Absolute Platform & Tool Secrecy:**
+          - You MUST NEVER mention internal frameworks, APIs, implementations, or backend setups by name.
+          - You MUST NEVER mention sub-agents' tools, internal tools, integrations, or how anything technically works.
+          - You MUST NEVER describe what tools do, how they function, or how agents achieve results.
+          - You may ONLY describe agents in high-level terms based strictly on their agent cards (what they generally do).
+          - From the user’s perspective, agents simply "handle tasks" in their domain — nothing more.
+          - Any internal technical detail is STRICTLY forbidden to appear in user-facing messages.
+
+        * **CRITICAL - Confirmation Gate (No Proxy Confirmation):**
+          - You MUST NEVER confirm, approve, or acknowledge a confirmation step on behalf of the user.
+          - If any remote agent returns a `confirmation_id`, `token`, `approve_id`, or asks for confirmation to proceed, you MUST:
+            1) Immediately relay the agent’s message to the user verbatim (including the `confirmation_id`).
+            2) Ask the user to reply with the exact confirmation command required (e.g., "confirm purchase <confirmation_id>").
+            3) STOP. Do NOT send any further messages to any agent and do NOT call any confirm/cancel/submit tools until the user replies with the exact confirmation text.
+          - A user saying “yes”, “go ahead”, “please proceed”, “send it”, or “do it” is NOT sufficient unless it includes the exact confirmation command + id.
+          - The only acceptable confirmation is an explicit user message that contains the exact confirmation command and the exact id.
+        * **CRITICAL - Do Not Generate Confirmation Commands:**
+          - You MUST NOT generate or simulate a confirmation command yourself.
+          - You MUST NOT paste a confirmation command into an agent task unless it was written by the user in the conversation after seeing the id.
+
+        * **CRITICAL - Permissions & Access Denial Handling (Stop Loops):**
+          - If ANY remote agent response contains an access/permission denial (including phrases like "not allowed", "access denied",
+            "insufficient rights", "permission", "forbidden", or an error payload indicating access restrictions),
+            you MUST NOT retry the same request, MUST NOT re-route the same task to the same agent, and MUST NOT loop.
+          - You MUST immediately communicate to the user that the requested action cannot be completed due to their current permissions,
+            and instruct them to contact their administrator to request access (or use an account with the required access).
+          - If the remote agent response explicitly lists required roles/groups, you MUST include that list for the user.
+          - This is NOT a confirmation-gate scenario; do NOT ask the user to confirm anything to proceed.
+
+        * **CRITICAL - Error Classification Guardrail:**
+          - If the remote agent returns a generic/server error code (e.g., -32603) but the message content indicates a permissions/access denial,
+            you MUST treat it as a permissions issue and apply the permissions handling rules above (no retries, no loops).
+
+        * **Autonomous Agent Engagement (except confirmations):** Never seek user permission before engaging with remote agents. If multiple agents are required to fulfill a request, connect with them directly without requesting user preference or confirmation. Confirmation steps ALWAYS require user confirmation as defined in the Confirmation Gate rule above.
         * **Transparent Communication:** Always present the complete and detailed response from the remote agent to the user.
         * **User Confirmation Relay:** If a remote agent asks for confirmation, and the user has not already provided it, relay this confirmation request to the user.
         * **Focused Information Sharing:** Provide remote agents with only relevant contextual information. Avoid extraneous details.
         * **No Redundant Confirmations:** Do not ask remote agents for confirmation of information or actions.
         * **Tool Reliance:** Strictly rely on available tools to address user requests. Do not generate responses based on assumptions. If information is insufficient, request clarification from the user.
+        * **Document Attachment Status:** If the user asks whether a document is attached, or if you need to know the attachment status, ask the involved agent to check using their attachment checking capability.
         * **Prioritize Recent Interaction:** Focus primarily on the most recent parts of the conversation when processing requests.
         * **Active Agent Prioritization:** If an active agent is already engaged, route subsequent related requests to that agent using the appropriate task update tool.
-        * **Be concise and to the point**: Don't be verbose and don't be too friendly. Be concise and to the point.
+        * **Answer Greetings or what can you do queries yourself**: Don't route these queries to remote agents.
+        * **CRITICAL - No Assumptions or Suggestions:** When a user requests a task without providing complete details, you must IMMEDIATELY route the request to the appropriate specialized agent. DO NOT suggest parameters, requirements, ask clarifying questions yourself, or conclude that from previous interactions. The specialized agent is responsible for determining and requesting any missing information. Your sole responsibility is routing—never assume, infer, or propose what might be needed based on available context or tools.
+        * **CRITICAL - Preserve User Message Integrity:** When routing simple, direct user queries, pass the user's EXACT message to the specialized agent. DO NOT reformulate, expand, or add context unless the message is genuinely unclear or the specialized agent has explicitly requested more context. The specialized agent is responsible for determining if clarification is needed and requesting it from the user.
+        * **Agent Authority:** Each specialized agent has complete authority over its domain. They determine requirements, validate inputs, and request clarifications. You are only a router—defer all domain-specific decisions to the appropriate agent.
+        * **CRITICAL - Pass Through Agent Responses VERBATIM:** When you receive a response from a remote agent:
+          - Return the EXACT response text without ANY modifications, reformatting, or summarization
+          - Do NOT reformat markdown tables - preserve the exact column structure and data
+          - Do NOT remove or combine columns (e.g., keep Street, City, Country separate - don't combine into "Location")
+          - Do NOT simplify or condense the information
+          - Simply pass through the complete response as-is to the user
+          - The specialized agents format their responses correctly - your job is ONLY to relay them unchanged
 
-        ## **Response Style**
-        - **ACT ANONYMOUSLY**: Never show the user your name or the name of the agent you are talking to.
-        - **BE CONCISE**: Use minimum words necessary. Avoid explanatory fluff.
-        - **Structure with Markdown:** Headers (##), bold for critical info, tables for comparisons, bullets for lists
-        - **Use Tables**: Use tables to show results of the tools and the agents as much as possible to be more readable and easier to understand.
-        - **Format:**
-          - Usernames, balances, and other critical information in **bold**
-          - Warnings in **bold** or > blockquotes
-          - Multi-step processes as numbered lists
+        * **Fallback Capability Response:** If the user request is too general, ambiguous, or cannot be confidently routed to a specialized agent, respond with a single standard message explaining in high-level terms what domains you can handle (banking FAQ, retail assistance) and do NOT engage any agent.
 
         **Agent Roster:**
         * Available Agents: `{self.agents}`
-        * Currently Active Agent: `{current_agent['active_agent']}`
+        * Currently Active Agent: `{current_agent["active_agent"]}`
         """
 
     def check_active_agent(self, context: ReadonlyContext):
@@ -240,17 +281,15 @@ class RoutingAgent:
         """
         state = context.state
         if (
-            'session_id' in state
-            and 'session_active' in state
-            and state['session_active']
-            and 'active_agent' in state
+                "session_id" in state
+                and "session_active" in state
+                and state["session_active"]
+                and "active_agent" in state
         ):
-            return {'active_agent': f'{state["active_agent"]}'}
-        return {'active_agent': 'None'}
+            return {"active_agent": f"{state['active_agent']}"}
+        return {"active_agent": "None"}
 
-    def before_model_callback(
-        self, callback_context: CallbackContext, llm_request
-    ):
+    def before_model_callback(self, callback_context: CallbackContext, llm_request):
         """Callback function before the model is called.
 
         :param callback_context: The callback context.
@@ -259,10 +298,10 @@ class RoutingAgent:
         :type llm_request: Any
         """
         state = callback_context.state
-        if 'session_active' not in state or not state['session_active']:
-            if 'session_id' not in state:
-                state['session_id'] = str(uuid.uuid4())
-            state['session_active'] = True
+        if "session_active" not in state or not state["session_active"]:
+            if "session_id" not in state:
+                state["session_id"] = str(uuid.uuid4())
+            state["session_active"] = True
 
     def list_remote_agents(self):
         """Lists the available remote agents.
@@ -275,18 +314,22 @@ class RoutingAgent:
 
         remote_agent_info = []
         for card in self.cards.values():
-            print(f'Found agent card: {card.model_dump(exclude_none=True)}')
-            print('=' * 100)
+            logger.debug(f"Found agent card: {card.model_dump(exclude_none=True)}")
+            print("=" * 100)
+
             remote_agent_info.append(
-                {'name': card.name, 'description': card.description}
+                {
+                    "name": card.name,
+                    "description": card.description,
+                }
             )
         return remote_agent_info
 
-    def _handle_agent_switching(self, state: dict, agent_name: str) -> None:
+    def _handle_agent_switching(self, state: State, agent_name: str) -> None:
         """Handles agent switching.
 
         :param state: The state.
-        :type state: dict
+        :type state: State
         :param agent_name: The name of the agent.
         :type agent_name: str
         """
@@ -294,15 +337,15 @@ class RoutingAgent:
         if previous_agent and previous_agent != agent_name:
             state["context_id"] = None
             state["task_id"] = None
-            print(
+            logger.debug(
                 f"DEBUG: Switching from {previous_agent} to {agent_name} - starting fresh context"
             )
 
-    def _get_task_id(self, state: dict) -> str | None:
+    def _get_task_id(self, state: State) -> str | None:
         """Gets the task ID from the state.
 
         :param state: The state.
-        :type state: dict
+        :type state: State
         :return: The task ID.
         :rtype: str | None
         """
@@ -310,74 +353,42 @@ class RoutingAgent:
             return state["task_id"]
         return None
 
-    def _get_or_create_context_id(self, state: dict) -> str:
+    def _get_or_create_context_id(self, state: State) -> str:
         """Gets or creates a context ID.
 
         :param state: The state.
-        :type state: dict
+        :type state: State
         :return: The context ID.
         :rtype: str
         """
         if "context_id" in state and state["context_id"] is not None:
             return state["context_id"]
         context_id = str(uuid.uuid4())
-        print(f"DEBUG: Generated new context_id: {context_id}")
+        logger.debug(f"DEBUG: Generated new context_id: {context_id}")
         return context_id
 
-    def _extract_message_metadata(self, state: dict) -> tuple[str, dict]:
-        """Extracts message metadata from the state.
+    def _extract_message_metadata(self, state: State) -> str:
+        """Extracts message ID from the state.
 
         :param state: The state.
-        :type state: dict
-        :return: A tuple containing the message ID and metadata.
-        :rtype: tuple[str, dict]
+        :type state: State
+        :return: The message ID.
+        :rtype: str
         """
         message_id = ""
-        metadata = {}
         if "input_message_metadata" in state:
-            metadata.update(**state["input_message_metadata"])
             if "message_id" in state["input_message_metadata"]:
                 message_id = state["input_message_metadata"]["message_id"]
         if not message_id:
             message_id = str(uuid.uuid4())
-        return message_id, metadata
-
-    def _add_jwt_to_metadata(self, state: dict, metadata: dict, agent_name: str) -> None:
-        """Adds a JWT token to the metadata.
-
-        :param state: The state.
-        :type state: dict
-        :param metadata: The metadata.
-        :type metadata: dict
-        :param agent_name: The name of the agent.
-        :type agent_name: str
-        """
-        jwt_token = state.get("jwt_token")
-        user_id = state.get("user_id")
-        username = state.get("username")
-        print(f"[ORCH-DEBUG] state type: {type(state)}")
-        print(
-            f"[ORCH-DEBUG] jwt_token: {jwt_token is not None if jwt_token else 'None'}"
-        )
-        print(f"[ORCH-DEBUG] user_id: {user_id}")
-        print(f"[ORCH-DEBUG] username: {username}")
-        if jwt_token:
-            metadata["jwt_token"] = jwt_token
-            metadata["user_id"] = user_id
-            metadata["username"] = username
-            print(f"[ORCH-DEBUG] Passing JWT token to {agent_name} agent")
-            print(f"[ORCH-DEBUG] metadata: {metadata}")
-        else:
-            print(f"[ORCH-DEBUG] No JWT token found in state for {agent_name} agent")
+        return message_id
 
     @staticmethod
     def _create_send_message_payload(
-        text: str,
-        message_id: str,
-        task_id: str | None = None,
-        context_id: str | None = None,
-        metadata: dict[str, Any] | None = None,
-        extra_parts: list[dict[str, Any]] | None = None,
+            text: str,
+            message_id: str,
+            task_id: str | None = None,
+            context_id: str | None = None,
     ) -> dict[str, Any]:
         """Creates the payload for sending a message.
 
@@ -389,16 +400,11 @@ class RoutingAgent:
         :type task_id: str | None
         :param context_id: The ID of the context.
         :type context_id: str | None
-        :param metadata: The metadata.
-        :type metadata: dict[str, Any] | None
-        :param extra_parts: Extra parts to include in the message.
-        :type extra_parts: list[dict[str, Any]] | None
         :return: The payload.
         :rtype: dict[str, Any]
         """
         parts: list[dict[str, Any]] = [{"type": "text", "text": text}]
-        if extra_parts:
-            parts.extend(extra_parts)
+
         payload: dict[str, Any] = {
             "message": {
                 "role": "user",
@@ -410,18 +416,17 @@ class RoutingAgent:
             payload["message"]["taskId"] = task_id
         if context_id:
             payload["message"]["contextId"] = context_id
-        if metadata:
-            payload["message"]["metadata"] = metadata
+
         return payload
 
     @staticmethod
-    def _handle_task_result(task_result: Task, state: dict, agent_name: str) -> str:
+    def _handle_task_result(task_result: Task, state: State, agent_name: str) -> str:
         """Handles the result of a task.
 
         :param task_result: The result of the task.
         :type task_result: Task
         :param state: The state.
-        :type state: dict
+        :type state: State
         :param agent_name: The name of the agent.
         :type agent_name: str
         :return: The result of the task.
@@ -435,12 +440,14 @@ class RoutingAgent:
                 if task_result.status.message and task_result.status.message.parts:
                     first_part = task_result.status.message.parts[0]
                     # Support both .root.text and .text shapes
-                    text_val = getattr(getattr(first_part, "root", None), "text", None) or getattr(first_part, "text", None)
+                    text_val = getattr(
+                        getattr(first_part, "root", None), "text", None
+                    ) or getattr(first_part, "text", None)
                     if text_val:
                         agent_question = text_val
-            except Exception:
-                pass
-            print(f"DEBUG: Agent requires input: {agent_question}")
+            except Exception as e:
+                logger.debug(f"DEBUG: Exception while getting agent question: {e}")
+            logger.debug(f"DEBUG: Agent requires input: {agent_question}")
             return f"The {agent_name} agent needs more information: {agent_question}"
         elif task_result.status.state == TaskState.completed:
             agent_response = ""
@@ -449,10 +456,13 @@ class RoutingAgent:
                     art = task_result.artifacts[0]
                     if getattr(art, "parts", None) and len(art.parts) > 0:
                         first_part = art.parts[0]
-                        text_val = getattr(getattr(first_part, "root", None), "text", None) or getattr(first_part, "text", None)
+                        text_val = getattr(
+                            getattr(first_part, "root", None), "text", None
+                        ) or getattr(first_part, "text", None)
                         if text_val:
                             agent_response = text_val
-            except Exception:
+            except Exception as e:
+                logger.debug(f"DEBUG: Exception while getting agent response: {e}")
                 pass
             state["task_id"] = None
             state["context_id"] = task_result.context_id
@@ -464,136 +474,193 @@ class RoutingAgent:
             state["context_id"] = task_result.context_id
             return f"Task sent to {agent_name}. Status: {task_result.status.state}"
 
-
-    async def send_message(
-        self, agent_name: str, task: str, tool_context: ToolContext
-    ):
+    async def send_message(self, agent_name: str, task: str, tool_context: ToolContext):
         """Sends a task to a remote seller agent.
-
-        This will send a message to the remote agent named agent_name.
 
         :param agent_name: The name of the agent to send the task to.
         :type agent_name: str
-        :param task: The comprehensive conversation context summary
-            and goal to be achieved regarding user inquiry and purchase request.
+        :param task: The user's request or query to be handled by the remote agent.
+            For simple, direct queries, pass the user's exact message.
+            For complex multi-step tasks, provide comprehensive context.
         :type task: str
-        :param tool_context: The tool context this method runs in.
+        :param tool_context: The tool context.
         :type tool_context: ToolContext
-        :yield: A dictionary of JSON data.
-        :rtype: dict
+        :return: The result of the task.
+        :rtype: str
         """
-        if agent_name not in self.remote_agent_connections:
-            raise ValueError(f'Agent {agent_name} not found')
-        state = tool_context.state
-        
-        # --- Auth Check ---
-        user_id = state.get("user_id", "")
-        # Check if the user is a guest (starts with "guest_") and trying to access Retail Agent
-        if agent_name == "Retail Agent" and (not user_id or user_id.startswith("guest_")):
-            print(f"DEBUG: Auth required for {agent_name} with user_id {user_id}")
-            raise AuthRequiredError()
-        # ------------------
+        # Check parent context before creating new span
+        parent_span = trace.get_current_span()
+        parent_ctx = parent_span.get_span_context()
+        logger.debug(f"DEBUG: routing_agent.send_message parent_trace_id={parent_ctx.trace_id if parent_ctx.is_valid else 'NONE'}")
 
-        self._handle_agent_switching(state, agent_name)
-        state["active_agent"] = agent_name
-        client = self.remote_agent_connections[agent_name]
+        with tracer.start_as_current_span("routing_agent.send_message") as span:
+            ctx = span.get_span_context()
+            logger.debug(f"DEBUG: routing_agent.send_message current_trace_id={ctx.trace_id}")
+            
+            # Add routing attributes
+            span.set_attribute("agent.id", "routing-agent")
+            span.set_attribute("agent.name", "Routing_agent")
+            span.set_attribute("routing.target_agent", agent_name)
+            span.set_attribute("routing.task", task[:500])  # Truncate long tasks
+            
+            state = tool_context.state
+            session_id = state.get("session_id", "unknown")
+            span.set_attribute("session.id", session_id)
+            
+            # Track active agent and switching
+            previous_agent = state.get("active_agent")
+            if previous_agent:
+                span.set_attribute("routing.previous_agent", previous_agent)
+                if previous_agent != agent_name:
+                    span.add_event(
+                        "routing.agent_switch",
+                        attributes={
+                            "from_agent": previous_agent,
+                            "to_agent": agent_name,
+                        }
+                    )
+            
+            span.add_event(
+                "routing.delegation_start",
+                attributes={"delegated_to": agent_name}
+            )
+            
+            try:
+                # Add routing attributes
+                span.set_attribute("routing.available_agents", ",".join(self.remote_agent_connections.keys()))
+                
+                if agent_name not in self.remote_agent_connections:
+                    error_msg = f"Agent {agent_name} not found"
+                    span.set_attribute("error", True)
+                    span.set_attribute("error.type", "agent_not_found")
+                    span.add_event("routing.error", attributes={"error.message": error_msg})
+                    raise ValueError(error_msg)
 
-        if not client:
-            raise ValueError(f'Client not available for {agent_name}')
-        task_id = self._get_task_id(state)
-        context_id = self._get_or_create_context_id(state)
-        message_id, metadata = self._extract_message_metadata(state)
-        self._add_jwt_to_metadata(state, metadata, agent_name)
+                self._handle_agent_switching(state, agent_name)
+                state["active_agent"] = agent_name
+                client = self.remote_agent_connections[agent_name]
+                
+                # Add agent URL to span
+                span.set_attribute("routing.agent_url", client.agent_url)
 
-        payload = self._create_send_message_payload(
-            text=task,
-            message_id=message_id,
-            task_id=task_id,
-            context_id=context_id,
-            metadata=metadata if metadata else None,
-        )
+                if not client:
+                    error_msg = f"Client not available for {agent_name}"
+                    span.set_attribute("error", True)
+                    span.add_event("routing.error", attributes={"error.message": error_msg})
+                    raise ValueError(error_msg)
+                    
+                task_id = self._get_task_id(state)
+                context_id = self._get_or_create_context_id(state)
+                message_id = self._extract_message_metadata(state)
+                
+                span.set_attribute("routing.context_id", context_id)
+                if task_id:
+                    span.set_attribute("routing.task_id", task_id)
+                span.set_attribute("routing.message_id", message_id)
 
-        message_request = SendMessageRequest(
-            id=message_id, params=MessageSendParams.model_validate(payload)
-        )
-        send_response: SendMessageResponse = await client.send_message(
-            message_request=message_request
-        )
-        print(
-            'send_response',
-            send_response.model_dump_json(exclude_none=True, indent=2),
-        )
+                payload = self._create_send_message_payload(
+                    text=task,
+                    message_id=message_id,
+                    task_id=task_id,
+                    context_id=context_id,
+                )
 
-        if not isinstance(send_response.root, SendMessageSuccessResponse):
-            print('received non-success response. Aborting get task ')
-            return None
+                # ---------------------------------------------------------------------------------------------------
+                bearer = state.get("user_jwt")
+                # Include Bearer in A2A message metadata (InventoryAgent reads context.message.metadata) ----
+                if bearer:
+                    meta = payload["message"].setdefault("metadata", {})
+                    meta["Authorization"] = f"Bearer {bearer}"
+                    meta["authorization"] = f"Bearer {bearer}"
+                # ---------------------------------------------------------------------------------------------------
 
-        if not isinstance(send_response.root.result, Task):
-            print('received non-task response. Aborting get task ')
-            return None
+                message_request = SendMessageRequest(
+                    id=message_id, params=MessageSendParams.model_validate(payload)
+                )
+                
+                span.add_event("routing.send_to_agent", attributes={"target": agent_name})
+                
+                send_response: SendMessageResponse = await client.send_message(
+                    message_request=message_request
+                )
+                print(
+                    "send_response",
+                    send_response.model_dump_json(exclude_none=True, indent=2),
+                )
 
-        task_result = send_response.root.result
-        print(f"DEBUG: Task result: {task_result}")
-        return self._handle_task_result(task_result, state, agent_name)
+                if not isinstance(send_response.root, SendMessageSuccessResponse):
+                    span.add_event("routing.non_success_response")
+                    logger.debug("received non-success response. Aborting get task ")
+                    return None
+
+                if not isinstance(send_response.root.result, Task):
+                    span.add_event("routing.non_task_response")
+                    logger.debug("received non-task response. Aborting get task ")
+                    return None
+
+                task_result = send_response.root.result
+                logger.debug(f"DEBUG: Task result: {task_result}")
+                
+                # Track task result
+                span.set_attribute("routing.task_state", task_result.status.state)
+                span.add_event(
+                    "routing.task_result",
+                    attributes={
+                        "task.state": task_result.status.state,
+                        "task.id": task_result.id if task_result.id else "none",
+                    }
+                )
+                
+                result = self._handle_task_result(task_result, state, agent_name)
+                span.set_attribute("routing.result", str(result)[:500])
+                return result
+                
+            except Exception as e:
+                span.record_exception(e)
+                span.set_attribute("error", True)
+                raise
 
 
-def get_initialized_routing_agent() -> Agent:
-    """Gets the initialized routing agent.
+# def _get_initialized_routing_agent_sync() -> Agent:
+#   """Synchronously creates and initializes the RoutingAgent."""
 
-    :raises RuntimeError: If the agent is not initialized.
-    :return: The initialized routing agent.
-    :rtype: Agent
-    """
-    raise RuntimeError(
-        "get_initialized_routing_agent is deprecated. Use await init_root_agent() or await get_root_agent_async()."
-    )
+#  async def _async_main() -> Agent:
+#     routing_agent_instance = await RoutingAgent.create(
+#        remote_agent_addresses=[
+#   os.getenv('INVENTORY_AGENT_URL', 'http://localhost:8001'),
+#  os.getenv('PURCHASE_AGENT_URL', 'http://localhost:8002'),
+# os.getenv('VENDOR_AGENT_URL', 'http://localhost:8003'),
+# os.getenv('EMAIL_AGENT_URL', 'http://localhost:8006'),
+# os.getenv('TENDERING_AGENT_URL', 'http://localhost:8007'),
+#       ]
+#  )
+# return routing_agent_instance.create_agent()
+
+# try:
+#   return asyncio.run(_async_main())
+# except RuntimeError as e:
+#   if 'asyncio.run() cannot be called from a running event loop' in str(e):
+# logger.info(
+#         f'Warning: Could not initialize RoutingAgent with asyncio.run(): {e}. '
+#        'This can happen if an event loop is already running (e.g., in Jupyter). '
+#       'Consider initializing RoutingAgent within an async function in your application.'
+#
+# raise
 
 
-# ----------------------------
-# Lazy async initialization API
-# ----------------------------
-_CACHED_ROOT_AGENT: Agent | None = None
+# root_agent = _get_initialized_routing_agent_sync()
 
-async def init_root_agent() -> Agent:
-    """Initializes the root agent.
+root_agent = None
 
-    :return: The root agent.
-    :rtype: Agent
-    """
-    global _CACHED_ROOT_AGENT
-    if _CACHED_ROOT_AGENT is not None:
-        return _CACHED_ROOT_AGENT
-    
-    print("[SERVER] Initializing root agent...")
-    print("[SERVER] Retail Agent URL: ", os.getenv("RETAIL_AGENT_URL", "http://localhost:8002"))
+
+async def init_routing_agent() -> None:
+    global root_agent
 
     routing_agent_instance = await RoutingAgent.create(
         remote_agent_addresses=[
-            os.getenv("RETAIL_AGENT_URL", "http://localhost:8002"),
-            os.getenv("FAQ_AGENT_URL", "http://localhost:8001"),
+            os.getenv("RETAIL_AGENT_URL", "http://retail-agent:8002"),
+            os.getenv("FAQ_AGENT_URL", "http://faq-agent:8001"),
         ]
     )
-    _CACHED_ROOT_AGENT = routing_agent_instance.create_agent()
-    return _CACHED_ROOT_AGENT
 
-
-async def get_root_agent_async() -> Agent:
-    """Gets the root agent asynchronously.
-
-    :return: The root agent.
-    :rtype: Agent
-    """
-    return await init_root_agent()
-
-
-def get_root_agent_cached() -> Agent:
-    """Gets the cached root agent.
-
-    :raises RuntimeError: If the root agent is not initialized.
-    :return: The cached root agent.
-    :rtype: Agent
-    """
-    if _CACHED_ROOT_AGENT is None:
-        raise RuntimeError("Root agent is not initialized yet. Initialize it in an async context first.")
-    return _CACHED_ROOT_AGENT
-
+    root_agent = routing_agent_instance.create_agent()
