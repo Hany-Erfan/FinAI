@@ -567,7 +567,7 @@ class RoutingAgent:
 
                 # ---------------------------------------------------------------------------------------------------
                 bearer = state.get("user_jwt")
-                # Include Bearer in A2A message metadata (InventoryAgent reads context.message.metadata) ----
+                # Include Bearer in A2A message metadata (SubAgent reads context.message.metadata) ----
                 if bearer:
                     meta = payload["message"].setdefault("metadata", {})
                     meta["Authorization"] = f"Bearer {bearer}"
@@ -621,34 +621,7 @@ class RoutingAgent:
                 raise
 
 
-# def _get_initialized_routing_agent_sync() -> Agent:
-#   """Synchronously creates and initializes the RoutingAgent."""
 
-#  async def _async_main() -> Agent:
-#     routing_agent_instance = await RoutingAgent.create(
-#        remote_agent_addresses=[
-#   os.getenv('INVENTORY_AGENT_URL', 'http://localhost:8001'),
-#  os.getenv('PURCHASE_AGENT_URL', 'http://localhost:8002'),
-# os.getenv('VENDOR_AGENT_URL', 'http://localhost:8003'),
-# os.getenv('EMAIL_AGENT_URL', 'http://localhost:8006'),
-# os.getenv('TENDERING_AGENT_URL', 'http://localhost:8007'),
-#       ]
-#  )
-# return routing_agent_instance.create_agent()
-
-# try:
-#   return asyncio.run(_async_main())
-# except RuntimeError as e:
-#   if 'asyncio.run() cannot be called from a running event loop' in str(e):
-# logger.info(
-#         f'Warning: Could not initialize RoutingAgent with asyncio.run(): {e}. '
-#        'This can happen if an event loop is already running (e.g., in Jupyter). '
-#       'Consider initializing RoutingAgent within an async function in your application.'
-#
-# raise
-
-
-# root_agent = _get_initialized_routing_agent_sync()
 
 root_agent = None
 

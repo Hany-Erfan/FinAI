@@ -197,7 +197,7 @@ observability/
 make monitor-up
 
 # Run your agents (they will send traces)
-docker-compose up orchestrator purchase-agent
+docker-compose up retail-agent bank-server host-agent
 
 # Check traces in Grafana
 open http://localhost:3000
