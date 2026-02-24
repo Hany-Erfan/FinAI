@@ -329,7 +329,7 @@ async def chat_endpoint(
 
 
 # =========================
-# Startup Hook (reference pattern)
+# Startup Hook
 # =========================
 
 @app.on_event("startup")
@@ -337,7 +337,6 @@ async def startup_event():
     global ROUTING_AGENT_RUNNER
 
     logger.info("Initializing Routing Agent...")
-    # IMPORTANT: this matches your NEW routing_agent.py API (init_routing_agent + root_agent)
     await routing_agent_module.init_routing_agent()
 
     logger.info("Creating ADK session...")
