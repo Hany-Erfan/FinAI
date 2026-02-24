@@ -288,6 +288,7 @@ async def chat_endpoint(
         current_request_state = {
             "user_id": user_id,
             "user_jwt": jwt_token,
+            "session_id": session_id
         }
 
         if not session:
