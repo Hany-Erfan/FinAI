@@ -3,7 +3,7 @@ Guardrails Service
 Analyzes inputs and outputs for the routing agent using GuardrailAI logic.
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from pydantic import BaseModel
 import uvicorn
 import os
