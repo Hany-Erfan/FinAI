@@ -1,6 +1,6 @@
 # Observability Module
 
-This module provides OpenTelemetry-based distributed tracing for the Purchaize agent system, exporting W3C traces to Grafana via the LGTM stack.
+This module provides OpenTelemetry-based distributed tracing for the AgentixBuddy agent system, exporting W3C traces to Grafana via the LGTM stack.
 
 ## Features
 
@@ -212,7 +212,7 @@ open http://localhost:3000
 - View agent logs for telemetry initialization messages
 
 **Connection errors:**
-- Verify network connectivity: `docker-compose network inspect purchaize_default`
+- Verify network connectivity: `docker-compose network inspect agentixbuddy_default`
 - Check LGTM health: `docker-compose exec lgtm test -f /tmp/ready`
 - Review LGTM logs: `docker-compose logs lgtm`
 
