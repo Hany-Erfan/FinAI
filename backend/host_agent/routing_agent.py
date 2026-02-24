@@ -463,7 +463,6 @@ class RoutingAgent:
                             agent_response = text_val
             except Exception as e:
                 logger.debug(f"DEBUG: Exception while getting agent response: {e}")
-                pass
             state["task_id"] = None
             state["context_id"] = task_result.context_id
             if agent_response:
