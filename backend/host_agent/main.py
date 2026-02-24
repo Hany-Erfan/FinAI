@@ -1,12 +1,11 @@
 """Host agent main entry point."""
 
 import os
-import traceback
 from typing import Dict, Any, Optional
-from pprint import pformat
+
 
 from fastapi import FastAPI, HTTPException, Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, OAuth2PasswordRequestForm
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
