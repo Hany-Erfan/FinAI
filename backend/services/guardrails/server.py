@@ -8,6 +8,9 @@ from pydantic import BaseModel
 import uvicorn
 import os
 
+from guardrails import Guard
+from guardrails.validators import Validator, register_validator, ValidationResult, PassResult, FailResult
+
 app = FastAPI(
     title="Guardrails Service",
     description="Validation service for routing agent inputs and outputs.",
@@ -22,26 +25,59 @@ class ValidationResponse(BaseModel):
     filtered_message: str | None = None
     reason: str | None = None
 
+# ---------------------------------------------------------
+# Define Custom Guardrails Validators
+# ---------------------------------------------------------
+
+@register_validator(name="is-safe-input", data_type="string")
+class IsSafeInput(Validator):
+    def validate(self, value: str, metadata: dict = {}) -> ValidationResult:
+        dangerous_keywords = ["drop table", "ignore previous instructions", "bypass"]
+        if any(keyword in value.lower() for keyword in dangerous_keywords):
+            return FailResult(error_message="Potentially malicious input detected.")
+        return PassResult()
+
+@register_validator(name="is-safe-output", data_type="string")
+class IsSafeOutput(Validator):
+    def validate(self, value: str, metadata: dict = {}) -> ValidationResult:
+        if "credit card number" in value.lower():
+            return FailResult(error_message="Sensitive PII detected in output.")
+        return PassResult()
+
+# ---------------------------------------------------------
+# Initialize Guards
+# ---------------------------------------------------------
+
+input_guard = Guard().use(IsSafeInput, on_fail="exception")
+output_guard = Guard().use(IsSafeOutput, on_fail="exception")
+
 
 @app.post("/check_input", response_model=ValidationResponse)
 async def check_input(payload: ValidationRequest):
     """
     Validates user input *before* it gets sent to the agent.
-    Implement actual guardrails-ai logic here.
+    Uses guardrails-ai to process validation.
     """
-    # TODO: Add real guardrails-ai logic here. For now, basic mock validation.
     is_safe = True
     reason = None
-    
-    # Example basic guard:
-    dangerous_keywords = ["drop table", "ignore previous instructions", "bypass"]
-    if any(keyword in payload.message.lower() for keyword in dangerous_keywords):
+    filtered_message = payload.message
+
+    try:
+        # Validate the input using our Guard
+        outcome = input_guard.validate(payload.message)
+        if outcome.validation_passed:
+            filtered_message = outcome.validated_output
+        else:
+            is_safe = False
+            reason = "Validation failed."
+    except Exception as e:
         is_safe = False
-        reason = "Potentially malicious input detected."
+        reason = str(e)
+        filtered_message = None
 
     return ValidationResponse(
         is_safe=is_safe,
-        filtered_message=payload.message if is_safe else None,
+        filtered_message=filtered_message if is_safe else None,
         reason=reason
     )
 
@@ -49,20 +85,28 @@ async def check_input(payload: ValidationRequest):
 async def check_output(payload: ValidationRequest):
     """
     Validates agent output *before* returning it to the user.
-    Implement actual guardrails-ai logic here.
+    Uses guardrails-ai to process validation.
     """
-    # TODO: Add real guardrails-ai logic here. For now, basic mock validation.
     is_safe = True
     reason = None
-    
-    # Example basic guard:
-    if "credit card number" in payload.message.lower():
+    filtered_message = payload.message
+
+    try:
+        # Validate the output using our Guard
+        outcome = output_guard.validate(payload.message)
+        if outcome.validation_passed:
+            filtered_message = outcome.validated_output
+        else:
+            is_safe = False
+            reason = "Validation failed."
+    except Exception as e:
         is_safe = False
-        reason = "Sensitive PII detected in output."
+        reason = str(e)
+        filtered_message = None
 
     return ValidationResponse(
         is_safe=is_safe,
-        filtered_message=payload.message if is_safe else None,
+        filtered_message=filtered_message if is_safe else None,
         reason=reason
     )
 
