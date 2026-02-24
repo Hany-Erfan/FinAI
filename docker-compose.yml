@@ -15,7 +15,7 @@ services:
       - host-agent
     environment:
       - VITE_API_URL=http://host-agent:8000
-    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+    command: [ "npm", "run", "dev", "--", "--host", "0.0.0.0" ]
 
   host-agent:
     build:
@@ -39,16 +39,12 @@ services:
       - RETAIL_AGENT_URL=http://retail-agent:8002
       - BANK_URL=http://bank-server:8006
       - PORT=8000
+      - GUARDRAILS_URL=http://guardrails-service:8005
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
       - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL}
     command: >
-      python -m uvicorn backend.host_agent.server:app
-      --host 0.0.0.0
-      --port 8000
-      --reload
-      --log-level debug
-      --use-colors
+      uvicorn backend.host_agent.main:app --host 0.0.0.0 --port 8000 --reload --log-level debug
 
   faq-agent:
     build:
@@ -72,12 +68,7 @@ services:
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
       - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL}
     command: >
-      python -m uvicorn backend.agents.faq_agent.server:faq_app
-      --host 0.0.0.0
-      --port 8001
-      --reload
-      --log-level debug
-      --use-colors
+      python -m uvicorn backend.agents.faq_agent.server:faq_app --host 0.0.0.0 --port 8001 --reload --log-level debug --use-colors
 
   retail-agent:
     build:
@@ -103,12 +94,7 @@ services:
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
       - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL}
     command: >
-      python -m uvicorn backend.agents.retail_agent.server:retail_app
-      --host 0.0.0.0
-      --port 8002
-      --reload
-      --log-level debug
-      --use-colors
+      python -m uvicorn backend.agents.retail_agent.server:retail_app --host 0.0.0.0 --port 8002 --reload --log-level debug --use-colors
 
   bank-server:
     build:
@@ -128,12 +114,7 @@ services:
       - JWT_EXPIRE_MINUTES=480
       - PORT=8006
     command: >
-      python -m uvicorn backend.bank_server.server:bank_app
-      --host 0.0.0.0
-      --port 8006
-      --reload
-      --log-level debug
-      --use-colors
+      python -m uvicorn backend.bank_server.server:bank_app --host 0.0.0.0 --port 8006 --reload --log-level debug --use-colors
 
   vector-db-service:
     build:
@@ -158,11 +139,18 @@ services:
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
       - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL}
     command: >
-      python -m uvicorn backend.vector_db_service.server:vector_db_app
-      --host 0.0.0.0
-      --port 8004
-      --reload
-      --log-level debug
-      --use-colors
-
-
+      python -m uvicorn backend.vector_db_service.server:vector_db_app --host 0.0.0.0 --port 8004 --reload --log-level debug --use-colors
+  guardrails-service:
+    build:
+      context: .
+      dockerfile: backend/services/guardrails/Dockerfile
+    container_name: guardrails-service
+    ports:
+      - "8005:8005"
+    volumes:
+      - ./backend:/app/backend
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PORT=8005
+    command: >
+      python -m backend.services.guardrails.server
