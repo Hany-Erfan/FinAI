@@ -1,6 +1,5 @@
 """Host agent main entry point."""
 
-import logging
 import os
 import traceback
 from typing import Dict, Any, Optional
