@@ -237,7 +237,7 @@ async def chat_endpoint(
         
         if not session:
             print(f"Creating new session with state: {current_request_state}")
-            session = await SESSION_SERVICE.create_session(
+            await SESSION_SERVICE.create_session(
                 app_name=APP_NAME,
                 user_id=user_id,
                 session_id=session_id,
