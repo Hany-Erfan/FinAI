@@ -396,7 +396,6 @@ def retrieve_documents(query, collection_name, top_k=1):
         return f"Error searching product database: {str(e)}"
 
 if __name__ == "__main__":
-    current_dir = os.path.dirname(os.path.abspath(__file__))
     # create_collections("sample_bank_products")
     print(get_collections())
     
