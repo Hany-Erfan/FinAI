@@ -1,6 +1,5 @@
 import pytest
 import httpx
-import asyncio
 import os
 
 # Base URLs for services (using localhost for local testing, can be overridden by env vars in CI)
