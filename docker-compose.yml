@@ -32,18 +32,19 @@ services:
       - PYTHONUNBUFFERED=1
       - UVICORN_LOG_LEVEL=debug
       - LOG_LEVEL=debug
-      - GOOGLE_API_KEY=${ORCHESTRATOR_GOOGLE_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production-min-32-chars
       - JWT_EXPIRE_MINUTES=480
       - FAQ_AGENT_URL=http://faq-agent:8001
       - RETAIL_AGENT_URL=http://retail-agent:8002
       - BANK_URL=http://bank-server:8006
       - PORT=8000
+      - GUARDRAILS_URL=http://guardrails-service:8005
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
       - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL}
     command: >
-      python -m uvicorn backend.host_agent.server:app --host 0.0.0.0 --port 8000 --reload --log-level debug --use-colors
+      uvicorn backend.host_agent.main:app --host 0.0.0.0 --port 8000 --reload --log-level debug
 
   faq-agent:
     build:
@@ -58,7 +59,7 @@ services:
       - PYTHONUNBUFFERED=1
       - UVICORN_LOG_LEVEL=debug
       - LOG_LEVEL=debug
-      - GOOGLE_API_KEY=${SERVICES_GOOGLE_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production-min-32-chars
       - JWT_EXPIRE_MINUTES=480
       - VECTOR_DB_SERVICE_URL=http://vector-db-service:8004
@@ -84,7 +85,7 @@ services:
       - PYTHONUNBUFFERED=1
       - UVICORN_LOG_LEVEL=debug
       - LOG_LEVEL=debug
-      - GOOGLE_API_KEY=${SERVICES_GOOGLE_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - BANK_URL=http://bank-server:8006
       - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production-min-32-chars
       - JWT_EXPIRE_MINUTES=480
@@ -108,7 +109,7 @@ services:
       - PYTHONUNBUFFERED=1
       - UVICORN_LOG_LEVEL=debug
       - LOG_LEVEL=debug
-      - GOOGLE_API_KEY=${SERVICES_GOOGLE_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production-min-32-chars
       - JWT_EXPIRE_MINUTES=480
       - PORT=8006
@@ -139,7 +140,7 @@ services:
       - PYTHONUNBUFFERED=1
       - UVICORN_LOG_LEVEL=debug
       - LOG_LEVEL=debug
-      - GOOGLE_API_KEY=${SERVICES_GOOGLE_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production-min-32-chars
       - JWT_EXPIRE_MINUTES=480
       - QDRANT_URL=http://qdrant:6333
@@ -151,6 +152,22 @@ services:
       - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL}
     command: >
       python -m uvicorn backend.vector_db_service.server:vector_db_app --host 0.0.0.0 --port 8004 --reload --log-level debug --use-colors
+
+
+  guardrails-service:
+    build:
+      context: .
+      dockerfile: backend/services/guardrails/Dockerfile
+    container_name: guardrails-service
+    ports:
+      - "8005:8005"
+    volumes:
+      - ./backend:/app/backend
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PORT=8005
+    command: >
+      python -m backend.services.guardrails.server
 
 volumes:
   qdrant_data:
