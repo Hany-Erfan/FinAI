@@ -1,5 +1,4 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
-from typing import List
 import os
 import shutil
 import logging
