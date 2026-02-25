@@ -173,6 +173,29 @@ async def check_guardrails_output(message: str) -> tuple[bool, str | None]:
     return True, message
 
 
+def log_tool_calls_and_responses(event) -> None:
+    # Log tool calls and responses to console (not sent to frontend)
+    if event.content and event.content.parts:
+        for part in event.content.parts:
+            if getattr(part, "function_call", None):
+                logger.info(f"\nTool Call: {part.function_call.name}")
+                logger.debug(
+                    pformat(
+                        part.function_call.model_dump(exclude_none=True),
+                        indent=2,
+                        width=80,
+                    )
+                )
+            elif getattr(part, "function_response", None):
+                response_content = part.function_response.response
+                if isinstance(response_content, dict) and "response" in response_content:
+                    formatted = response_content["response"]
+                else:
+                    formatted = response_content
+                logger.info(f"\nTool Response from {part.function_response.name}")
+                logger.debug(pformat(formatted, indent=2, width=80))
+
+
 async def get_response_from_agent(message: str, user_id: str, session_id: str) -> str:
     """
     Use the global Runner, log tool calls, return only final response text.
@@ -190,26 +213,7 @@ async def get_response_from_agent(message: str, user_id: str, session_id: str) -
 
         final_response_text = ""
         async for event in event_iterator:
-            # Log tool calls and responses to console (not sent to frontend)
-            if event.content and event.content.parts:
-                for part in event.content.parts:
-                    if getattr(part, "function_call", None):
-                        logger.info(f"\nTool Call: {part.function_call.name}")
-                        logger.debug(
-                            pformat(
-                                part.function_call.model_dump(exclude_none=True),
-                                indent=2,
-                                width=80,
-                            )
-                        )
-                    elif getattr(part, "function_response", None):
-                        response_content = part.function_response.response
-                        if isinstance(response_content, dict) and "response" in response_content:
-                            formatted = response_content["response"]
-                        else:
-                            formatted = response_content
-                        logger.info(f"\nTool Response from {part.function_response.name}")
-                        logger.debug(pformat(formatted, indent=2, width=80))
+            log_tool_calls_and_responses(event)
 
             if event.is_final_response():
                 if event.content and event.content.parts:
