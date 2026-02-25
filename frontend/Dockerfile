@@ -5,7 +5,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies inside the container (Linux environment)
-RUN npm ci
+RUN npm install --no-audit --no-fund
 
 COPY . .
 

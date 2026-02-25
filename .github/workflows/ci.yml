@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
+      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY || 'dummy_key' }}
       ORCHESTRATOR_GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY || 'dummy_key' }}
       SERVICES_GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY || 'dummy_key' }}
       LANGFUSE_SECRET_KEY: dummy
