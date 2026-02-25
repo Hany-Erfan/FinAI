@@ -25,6 +25,20 @@ Or include in your requirements.txt:
 -e ../observability     # for other backend services
 ```
 
+If that doesn't work, install uv and then sync as follows:
+
+MacOS/Linux:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv sync
+```
+Windows using powershell:
+```bash
+irm https://astral.sh/uv/install.ps1 | iex
+uv sync
+```
+
 ## Usage
 
 ### Basic Setup
