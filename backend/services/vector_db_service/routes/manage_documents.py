@@ -2,7 +2,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 import os
 import shutil
 import logging
-from backend.vector_db_service.store_products import (
+from backend.services.vector_db_service.store_products import (
     read_products_xlsx_and_chunk,
     generate_embeddings,
     store_embeddings,
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 # Constants
 VECTOR_DB_COLLECTION = os.getenv("VECTOR_DB_COLLECTION", "sample_bank_products")
-UPLOAD_DIR = os.getenv("UPLOAD_DIR", "backend/vector_db_service/uploads")
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "backend/services/vector_db_service/uploads")
 
 manage_documents_router = APIRouter(
     prefix="/vector_db_service",

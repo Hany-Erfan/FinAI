@@ -128,7 +128,7 @@ services:
   vector-db-service:
     build:
       context: .
-      dockerfile: backend/vector_db_service/Dockerfile
+      dockerfile: backend/services/vector_db_service/Dockerfile
     container_name: vector-db-service
     ports:
       - "8004:8004"
@@ -151,7 +151,7 @@ services:
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
       - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL}
     command: >
-      python -m uvicorn backend.vector_db_service.server:vector_db_app --host 0.0.0.0 --port 8004 --reload --log-level debug --use-colors
+      python -m uvicorn backend.services.vector_db_service.server:vector_db_app --host 0.0.0.0 --port 8004 --reload --log-level debug --use-colors
 
   guardrails-service:
     build:

@@ -2,9 +2,9 @@ import uvicorn
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from backend.vector_db_service.routes.vector_db_health import vector_db_health_router
-from backend.vector_db_service.routes.retreive_product import retreive_product_router
-from backend.vector_db_service.routes.manage_documents import manage_documents_router
+from backend.services.vector_db_service.routes.vector_db_health import vector_db_health_router
+from backend.services.vector_db_service.routes.retreive_product import retreive_product_router
+from backend.services.vector_db_service.routes.manage_documents import manage_documents_router
 
 vector_db_app = FastAPI(
     title="Vector DB Service",
@@ -35,5 +35,5 @@ if __name__ == "__main__":
     host = os.getenv("VECTOR_DB_HOST", "0.0.0.0")
     port = int(os.getenv("VECTOR_DB_PORT", "8004"))
     uvicorn.run(
-        "backend.vector_db_service.server:vector_db_app", host=host, port=port, reload=True
+        "backend.services.vector_db_service.server:vector_db_app", host=host, port=port, reload=True
     )

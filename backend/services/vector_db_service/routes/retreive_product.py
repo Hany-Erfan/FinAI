@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 import os
-from backend.vector_db_service.store_products import retrieve_documents
+from backend.services.vector_db_service.store_products import retrieve_documents
 
 retreive_product_router = APIRouter(
     prefix="/vector_db_service",
