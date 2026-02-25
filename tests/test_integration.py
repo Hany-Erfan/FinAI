@@ -32,5 +32,6 @@ async def test_retail_agent_health():
 @pytest.mark.asyncio
 async def test_vector_db_health():
     async with httpx.AsyncClient() as client:
-        response = await client.get(f"{VECTOR_DB_URL}/docs")
+        # Vector DB Service uses a router with prefix /vector_db_service
+        response = await client.get(f"{VECTOR_DB_URL}/vector_db_service/health")
         assert response.status_code == 200

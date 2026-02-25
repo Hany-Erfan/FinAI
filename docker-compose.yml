@@ -153,7 +153,6 @@ services:
     command: >
       python -m uvicorn backend.vector_db_service.server:vector_db_app --host 0.0.0.0 --port 8004 --reload --log-level debug --use-colors
 
-
   guardrails-service:
     build:
       context: .
