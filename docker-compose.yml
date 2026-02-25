@@ -32,7 +32,7 @@ services:
       - PYTHONUNBUFFERED=1
       - UVICORN_LOG_LEVEL=debug
       - LOG_LEVEL=debug
-      - GOOGLE_API_KEY=${ORCHESTRATOR_GOOGLE_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production-min-32-chars
       - JWT_EXPIRE_MINUTES=480
       - FAQ_AGENT_URL=http://faq-agent:8001
@@ -59,7 +59,7 @@ services:
       - PYTHONUNBUFFERED=1
       - UVICORN_LOG_LEVEL=debug
       - LOG_LEVEL=debug
-      - GOOGLE_API_KEY=${SERVICES_GOOGLE_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production-min-32-chars
       - JWT_EXPIRE_MINUTES=480
       - VECTOR_DB_SERVICE_URL=http://vector-db-service:8004
@@ -85,7 +85,7 @@ services:
       - PYTHONUNBUFFERED=1
       - UVICORN_LOG_LEVEL=debug
       - LOG_LEVEL=debug
-      - GOOGLE_API_KEY=${SERVICES_GOOGLE_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - BANK_URL=http://bank-server:8006
       - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production-min-32-chars
       - JWT_EXPIRE_MINUTES=480
@@ -109,7 +109,7 @@ services:
       - PYTHONUNBUFFERED=1
       - UVICORN_LOG_LEVEL=debug
       - LOG_LEVEL=debug
-      - GOOGLE_API_KEY=${SERVICES_GOOGLE_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production-min-32-chars
       - JWT_EXPIRE_MINUTES=480
       - PORT=8006
@@ -129,7 +129,7 @@ services:
       - PYTHONUNBUFFERED=1
       - UVICORN_LOG_LEVEL=debug
       - LOG_LEVEL=debug
-      - GOOGLE_API_KEY=${SERVICES_GOOGLE_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production-min-32-chars
       - JWT_EXPIRE_MINUTES=480
       - QDRANT_URL=https://2580c3f4-7869-40a8-b26b-3087029a69b1.europe-west3-0.gcp.cloud.qdrant.io:6333
@@ -140,6 +140,7 @@ services:
       - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL}
     command: >
       python -m uvicorn backend.vector_db_service.server:vector_db_app --host 0.0.0.0 --port 8004 --reload --log-level debug --use-colors
+
   guardrails-service:
     build:
       context: .
