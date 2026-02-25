@@ -3,24 +3,25 @@
 import os
 import traceback
 from pprint import pformat
-from typing import Dict, Any, Optional
-
+import secrets
+import traceback
+from typing import Optional
 import httpx
 import uvicorn
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPBearer
 from pydantic import BaseModel
-
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.adk.events import Event, EventActions
 from google.adk.memory import InMemoryMemoryService
 from google.genai import types
 
+from backend.bank_server.utils.security_deps import auth_cookie_name, csrf_cookie_name, get_current_user, refresh_session_cookies, require_admin, verify_csrf
+from backend.bank_server.utils.user_store import get_user_by_username
+from backend.common.pass_auth import verify_password
 import backend.host_agent.routing_agent as routing_agent_module
-
-from backend.common.jwt_auth import create_access_token, verify_token
 from observability import get_logger, setup_telemetry, instrument_app, setup_logging
 
 logger = get_logger(__name__)
@@ -59,7 +60,7 @@ app = FastAPI(title="Host Agent HTTP Bridge")
 instrument_app(app)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*", "http://localhost:5173", "http://127.0.0.1:5173"], # for local setup
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -85,53 +86,26 @@ class ChatResponse(BaseModel):
     response: str
     status: str = "completed"
 
-
 class LoginRequest(BaseModel):
     username: str
     password: str
-
+    session_id: str
 
 class LoginResponse(BaseModel):
-    access_token: str
-    token_type: str
     user_id: str
+    message: str
+    role: str
     username: str
 
+class User(BaseModel):
+    username: str
+    role: str
+    full_name: str
+    user_id: str
 
 # =========================
 # Helpers
 # =========================
-
-async def bank_authenticate(username: str, password: str) -> str | None:
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(
-                f"{BANK_URL}/user_auth/authenticate",
-                json={"username": username, "password": password},
-            )
-            if response.status_code == 200:
-                data = response.json()
-                if data.get("success"):
-                    return data.get("user_id")
-            return None
-    except Exception as e:
-        logger.exception(f"[ERROR] bank authentication: {e}")
-        return None
-
-
-async def get_current_user_optional(
-    credentials: HTTPAuthorizationCredentials | None = Depends(
-        HTTPBearer(auto_error=False)
-    ),
-) -> Dict[str, Any] | None:
-    if not credentials:
-        return None
-    try:
-        return verify_token(credentials.credentials)
-    except Exception as e:
-        logger.warning(f"[WARN] Invalid token in optional auth: {e}")
-        return None
-
 
 async def check_guardrails_input(message: str) -> bool:
     """Check user input against Guardrails service."""
@@ -239,28 +213,74 @@ async def get_response_from_agent(message: str, user_id: str, session_id: str) -
 # =========================
 
 @app.post("/login", response_model=LoginResponse, tags=["login"])
-async def login_endpoint(request: LoginRequest):
-    user_id = await bank_authenticate(request.username, request.password)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Authentication failed")
+def login(payload: LoginRequest, response: Response) -> LoginResponse:
+    if not payload.session_id.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Session id required")
 
-    # keep your existing token create method
-    access_token = create_access_token(user_id=user_id)
+    user = get_user_by_username(payload.username)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password",
+        )
+
+    if not verify_password(payload.password, user["password_hash"], user["salt"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password",
+        )
+
+    csrf_token = secrets.token_urlsafe(32)
+    refresh_session_cookies(response, user, payload.session_id, csrf_token)
     return LoginResponse(
-        access_token=access_token,
-        token_type="bearer",
-        user_id=user_id,
-        username=request.username,
+        message="Login successful",
+        role=user["role"],
+        username=user["username"],
+        user_id=user["user_id"]
     )
+
+
+@app.get("/currentUser", response_model=User , tags=["User"])
+def getCurrentUser(current_user=Depends(get_current_user)) -> User:
+    return User(
+        user_id=current_user["user_id"],
+        username=current_user["username"],
+        role=current_user["role"],
+        full_name=current_user["full_name"],
+)
+
+@app.post("/logout", tags=["Logout"])
+def logout(
+    request: Request,
+    response: Response,
+    current_user=Depends(get_current_user),
+    _: None = Depends(verify_csrf),
+) -> dict:
+    del current_user, _
+    session_id = request.headers.get("X-Session-Id")
+    if not session_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing session id")
+    response.delete_cookie(key=auth_cookie_name(session_id), path="/")
+    response.delete_cookie(key=csrf_cookie_name(session_id), path="/")
+    return {"message": "Logged out"}
+
+
+@app.get("/admin/management", tags=["Admin"])
+def admin_panel(current_user=Depends(require_admin)) -> dict:
+    return {
+        "message": "Welcome to admin management",
+        "user_id": current_user.get("user_id"),
+        "username": current_user["username"],
+        "role": current_user["role"],
+}
+
 
 
 @app.post("/chat", response_model=ChatResponse, tags=["Chat"])
 async def chat_endpoint(
     request: ChatRequest,
-    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(
-        HTTPBearer(auto_error=False)
-    ),
+    current_user=Depends(get_current_user),
+    _: None = Depends(verify_csrf),
 ):
     try:
         # 1) Guardrails input
@@ -271,27 +291,19 @@ async def chat_endpoint(
                 status="completed",
             )
 
-        # 2) Determine user/session
-        if current_user:
-            user_id = str(current_user.get("user_id", DEFAULT_USER_ID))
-            jwt_token = credentials.credentials if credentials else None
-        else:
-            user_id = "guest_user"
-            jwt_token = None
-
-        session_id = request.session_id or f"session_{user_id}"
+        session_id = request.session_id
 
         # 3) Create/update ADK session state
         session = await SESSION_SERVICE.get_session(
             app_name=APP_NAME,
-            user_id=user_id,
+            user_id=current_user["user_id"],
             session_id=session_id,
         )
 
         # IMPORTANT: routing_agent.send_message reads state["user_jwt"]
         current_request_state = {
-            "user_id": user_id,
-            "user_jwt": jwt_token,
+            "user_id": current_user["user_id"],
+            "username": current_user["username"],
             "session_id": session_id
         }
 
@@ -299,7 +311,7 @@ async def chat_endpoint(
             logger.info(f"Creating new session with state: {current_request_state}")
             await SESSION_SERVICE.create_session(
                 app_name=APP_NAME,
-                user_id=user_id,
+                user_id=current_user["user_id"],
                 session_id=session_id,
                 state=current_request_state or {},
             )
@@ -317,7 +329,7 @@ async def chat_endpoint(
 
         # 4) just call get_response_from_agent (global runner)
         response_text = await get_response_from_agent(
-            request.message, user_id=user_id, session_id=session_id
+            request.message, user_id=current_user["user_id"], session_id=session_id
         )
 
         # 5) Guardrails output
@@ -358,9 +370,6 @@ async def startup_event():
         session_service=SESSION_SERVICE,
         memory_service=MEMORY_SERVICE,
     )
-
-    logger.info("Startup complete.")
-
 
 def main():
     uvicorn.run(
