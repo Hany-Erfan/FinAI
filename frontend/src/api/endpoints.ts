@@ -9,4 +9,7 @@ export const Endpoints = {
   BACKOFFICE_DELETE: (id: string) => `${VECTOR_DB_BASE}/delete/${id}`,
   BACKOFFICE_CLEAR: `${VECTOR_DB_BASE}/clear`,
   BACKOFFICE_UPSERT: `${VECTOR_DB_BASE}/upsert`,
+  CURRENT_USER: `${API_BASE}/currentUser`,
+  LOGOUT: `${API_BASE}/logout`,
+  ADMIN_MANAGEMENT: `${API_BASE}/admin/management`
 } as const;
