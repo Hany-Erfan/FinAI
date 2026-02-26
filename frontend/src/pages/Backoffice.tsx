@@ -13,7 +13,11 @@ interface Product {
     answer_ar: string;
 }
 
-export default function Backoffice() {
+interface BackofficeProps {
+    sessionId: string;
+}
+
+export default function Backoffice({ sessionId }: BackofficeProps) {
     const [products, setProducts] = useState<Product[]>([]);
     const [file, setFile] = useState<File | null>(null);
     const [loading, setLoading] = useState(false);
@@ -30,13 +34,18 @@ export default function Backoffice() {
     const navigate = useNavigate();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    const axiosConfig = {
+        headers: { 'X-Session-Id': sessionId },
+        withCredentials: true
+    };
+
     useEffect(() => {
         fetchProducts();
     }, []);
 
     const fetchProducts = async () => {
         try {
-            const res = await axios.get(Endpoints.BACKOFFICE_PRODUCTS);
+            const res = await axios.get(Endpoints.BACKOFFICE_PRODUCTS, axiosConfig);
             if (res.data.success) {
                 setProducts(res.data.products || res.data);
             }
@@ -60,7 +69,8 @@ export default function Backoffice() {
         formData.append("file", file);
         try {
             const res = await axios.post(Endpoints.BACKOFFICE_UPLOAD, formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
+                headers: { 'Content-Type': 'multipart/form-data', 'X-Session-Id': sessionId },
+                withCredentials: true
             });
             if (res.data.success) {
                 setMessage('Success: ' + res.data.message);
@@ -83,7 +93,7 @@ export default function Backoffice() {
         e.preventDefault();
         setLoading(true);
         try {
-            const res = await axios.post(Endpoints.BACKOFFICE_UPSERT, currentProduct);
+            const res = await axios.post(Endpoints.BACKOFFICE_UPSERT, currentProduct, axiosConfig);
             if (res.data.success) {
                 setMessage('Success: Product saved successfully!');
                 setShowModal(false);
@@ -101,7 +111,7 @@ export default function Backoffice() {
     const handleDelete = async (productId: string) => {
         if (!window.confirm(`Are you sure you want to delete this product?`)) return;
         try {
-            const res = await axios.delete(Endpoints.BACKOFFICE_DELETE(productId));
+            const res = await axios.delete(Endpoints.BACKOFFICE_DELETE(productId), axiosConfig);
             if (res.data.success) {
                 setMessage(`Success: Deleted product`);
                 fetchProducts();
@@ -117,7 +127,7 @@ export default function Backoffice() {
         if (!window.confirm("ARE YOU SURE? This will permanently delete ALL products from the database.")) return;
         setLoading(true);
         try {
-            const res = await axios.delete(Endpoints.BACKOFFICE_CLEAR);
+            const res = await axios.delete(Endpoints.BACKOFFICE_CLEAR, axiosConfig);
             if (res.data.success) {
                 setMessage("Success: Cleared the entire database.");
                 fetchProducts();

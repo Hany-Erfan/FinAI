@@ -33,20 +33,8 @@ export async function getCurrentUser(sessionId) {
 }
 
 
-export async function showAdminManagement(sessionId) {
-  const response = await fetch(`${Endpoints.ADMIN_MANAGEMENT}`, {
-    headers: {
-      ...sessionHeaders(sessionId),
-    },
-    credentials: "include",
-  });
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({ detail: "Unauthorized" }));
-    throw new Error(err.detail || "Unauthorized");
-  }
-
-  return response.json();
+export function showAdminManagement() {
+  window.location.href = '/backoffice';
 }
 
 export async function logout(sessionId) {

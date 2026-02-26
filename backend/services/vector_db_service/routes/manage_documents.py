@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Request, Response
 import os
 import shutil
 import logging
@@ -11,6 +11,7 @@ from backend.services.vector_db_service.store_products import (
     delete_all_products,
     upsert_product
 )
+from backend.bank_server.utils.security_deps import require_admin
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ manage_documents_router = APIRouter(
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @manage_documents_router.post("/upload")
-async def upload_document(file: UploadFile = File(...)):
+async def upload_document(file: UploadFile = File(...), current_user=Depends(require_admin)):
     """
     Uploads an Excel file, parses it into chunks, generates embeddings, 
     and stores them in Qdrant.
@@ -68,13 +69,13 @@ async def upload_document(file: UploadFile = File(...)):
             os.remove(file_path)
 
 @manage_documents_router.get("/products")
-async def list_products():
+async def list_products(current_user=Depends(require_admin)):
     """Returns a list of all products (unique questions) currently in the DB."""
     products = get_all_product_ids(VECTOR_DB_COLLECTION)
     return {"success": True, "products": products}
 
 @manage_documents_router.delete("/delete/{product_id}")
-async def remove_product(product_id: str):
+async def remove_product(product_id: str, current_user=Depends(require_admin)):
     """Deletes all chunks associated with a specific product ID."""
     success = delete_product(product_id, VECTOR_DB_COLLECTION)
     if success:
@@ -83,7 +84,7 @@ async def remove_product(product_id: str):
         raise HTTPException(status_code=500, detail="Failed to delete product")
 
 @manage_documents_router.delete("/clear")
-async def clear_all_products():
+async def clear_all_products(current_user=Depends(require_admin)):
     """Clears the entire product collection."""
     success = delete_all_products(VECTOR_DB_COLLECTION)
     if success:
@@ -92,7 +93,7 @@ async def clear_all_products():
         raise HTTPException(status_code=500, detail="Failed to clear products")
 
 @manage_documents_router.post("/upsert")
-async def upsert_single_product(product_data: dict):
+async def upsert_single_product(product_data: dict, current_user=Depends(require_admin)):
     """
     Adds or updates a single product item.
     Expects payload: {question_en, answer_en, question_ar, answer_ar, category}

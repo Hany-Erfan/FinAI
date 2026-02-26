@@ -53,7 +53,11 @@ jobs:
 
       - name: Run Integration Tests
         run: |
-          pytest tests/test_integration.py
+          pytest tests/test_integration.py -v
+
+      - name: Run Backoffice Auth Tests
+        run: |
+          pytest tests/test_backoffice_auth.py -v
 
       - name: Cleanup
         if: always()
