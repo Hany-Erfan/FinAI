@@ -25,6 +25,28 @@ google_client = genai.Client(api_key=GOOGLE_API_KEY)
 
 
 
+def _find_qa_pair(row, start_col, num_columns):
+    """
+    Helper to find Q&A pair starting from a column.
+    returns (question, answer) or (None, None)
+    """
+    for i in range(start_col, min(start_col + 5, num_columns - 1)):
+        q = str(row[i]).strip() if not pd.isna(row[i]) else ""
+        a = str(row[i+1]).strip() if not pd.isna(row[i+1]) else ""
+        
+        if not q or not a: continue
+
+        # Heuristic for a question: ends with ? or contains specific keywords, and has an answer
+        # Or just long enough strings that look like Q&A
+        is_q = q.endswith('?') or q.endswith('؟') or (len(q) > 15)
+        is_a = len(a) > 5
+        
+        if is_q and is_a:
+            # Ensure we don't pick up headers
+            if q.upper() not in ["ENGLISH", "ARABIC", "UXW FINAL COPY", "QUESTION", "ANSWER", "CATEGORY"]:
+                return q, a
+    return None, None
+
 def get_collections():
     """
     Safely retrieves the list of all collections from the Qdrant database.
@@ -93,32 +115,12 @@ def read_products_xlsx_and_chunk(file_path: str):
         # Start from the row AFTER the last found header row
         start_row = max_header_row + 1
         
+        num_columns = len(df.columns)
         for r_idx in range(start_row, len(df)):
             row = df.iloc[r_idx]
-            
-            # Helper to find Q&A pair starting from a column
-            def find_qa_pair(start_col):
-                # Try start_col, start_col+1, start_col+2 to find a question
-                # returns (question, answer) or (None, None)
-                for i in range(start_col, min(start_col + 5, len(df.columns) - 1)):
-                    q = str(row[i]).strip() if not pd.isna(row[i]) else ""
-                    a = str(row[i+1]).strip() if not pd.isna(row[i+1]) else ""
-                    
-                    if not q or not a: continue
 
-                    # Heuristic for a question: ends with ? or contains specific keywords, and has an answer
-                    # Or just long enough strings that look like Q&A
-                    is_q = q.endswith('?') or q.endswith('؟') or (len(q) > 15)
-                    is_a = len(a) > 5
-                    
-                    if is_q and is_a:
-                        # Ensure we don't pick up headers
-                        if q.upper() not in ["ENGLISH", "ARABIC", "UXW FINAL COPY", "QUESTION", "ANSWER", "CATEGORY"]:
-                            return q, a
-                return None, None
-
-            e_q, e_a = find_qa_pair(eng_start)
-            a_q, a_a = find_qa_pair(ara_start)
+            e_q, e_a = _find_qa_pair(row, eng_start, num_columns)
+            a_q, a_a = _find_qa_pair(row, ara_start, num_columns)
 
             if e_q and e_a:
                 # Use a deterministic ID based on the English question

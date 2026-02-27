@@ -32,11 +32,6 @@ export async function getCurrentUser(sessionId) {
   return response.json();
 }
 
-
-export function showAdminManagement() {
-  window.location.href = '/backoffice';
-}
-
 export async function logout(sessionId) {
   await fetch(`${Endpoints.LOGOUT}`, {
     method: "POST",

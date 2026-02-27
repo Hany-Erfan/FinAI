@@ -2,6 +2,7 @@ import React, { useState, useEffect, ChangeEvent, FormEvent, useRef } from 'reac
 import axios from 'axios';
 import { Endpoints } from '../api/endpoints';
 import { useNavigate } from 'react-router-dom';
+import { sessionHeaders, csrfHeaders } from '../utils/authUtils';
 import './Backoffice.css';
 
 interface Product {
@@ -35,7 +36,10 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const axiosConfig = {
-        headers: { 'X-Session-Id': sessionId },
+        headers: {
+            ...sessionHeaders(sessionId),
+            ...csrfHeaders(sessionId)
+        },
         withCredentials: true
     };
 
@@ -69,7 +73,11 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
         formData.append("file", file);
         try {
             const res = await axios.post(Endpoints.BACKOFFICE_UPLOAD, formData, {
-                headers: { 'Content-Type': 'multipart/form-data', 'X-Session-Id': sessionId },
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                    ...sessionHeaders(sessionId),
+                    ...csrfHeaders(sessionId)
+                },
                 withCredentials: true
             });
             if (res.data.success) {

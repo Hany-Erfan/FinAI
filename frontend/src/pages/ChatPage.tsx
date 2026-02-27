@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { showAdminManagement } from '../api/login';
 import { sendChatMessage } from '../api/chat';
 
 interface Message {
@@ -35,7 +34,7 @@ const AgentIcon = () => (
   </svg>
 );
 
-const ChatPage= ({ auth, onLogout, sessionId }) => {
+const ChatPage = ({ auth, onLogout, sessionId }) => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [input, setInput] = useState('');
@@ -132,14 +131,6 @@ const ChatPage= ({ auth, onLogout, sessionId }) => {
     }
   };
 
-  const handleAdminCheck = async () => {
-    try {
-      await showAdminManagement(sessionId);
-    } catch (err) {
-      console.error('Error checking admin:', err);
-    }
-  };
-
   const activeMessages = getActiveSession()?.messages || [];
 
   useEffect(() => {
@@ -152,21 +143,21 @@ const ChatPage= ({ auth, onLogout, sessionId }) => {
     <div className="page-container">
       <div className="sidebar">
         {auth.role === "admin" ? (
-                <div className="admin-box">
-                  <button onClick={handleAdminCheck}>Manage FAQs</button>
-                </div>
-              ) : null}
+          <div className="admin-box">
+            <button onClick={() => navigate('/backoffice')}>Manage FAQs</button>
+          </div>
+        ) : null}
         {/* Sidebar Login/Logout */}
         <div style={{ marginTop: 'auto', padding: '1rem', borderTop: '1px solid var(--border-color)' }}>
-            <div className="user-profile-container">
-              <div className="user-profile-left">
-                <div className="user-avatar">{getInitials(currentUser)}</div>
-                <div className="user-info">
-                  <span className="user-name">{currentUser}</span>
-                </div>
+          <div className="user-profile-container">
+            <div className="user-profile-left">
+              <div className="user-avatar">{getInitials(currentUser)}</div>
+              <div className="user-info">
+                <span className="user-name">{currentUser}</span>
               </div>
-                <button onClick={onLogout}>Logout</button>
             </div>
+            <button onClick={onLogout}>Logout</button>
+          </div>
         </div>
       </div>
       <div className="chat-container">
