@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { sendChatMessage } from '../api/chat';
+import { useNavigate } from 'react-router-dom';
 
 interface Message {
   text: string;
@@ -35,6 +36,7 @@ const AgentIcon = () => (
 );
 
 const ChatPage = ({ auth, onLogout, sessionId }) => {
+  const navigate = useNavigate();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [input, setInput] = useState('');
