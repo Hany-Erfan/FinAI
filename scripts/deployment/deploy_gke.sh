@@ -78,46 +78,50 @@ kubectl create configmap app-env \
   --dry-run=client -o yaml | kubectl apply -f -
 
 # ----------------------------
-# --- Configure Workload Identity ---
+# --- Configure Workload Identity (SKIPPED - using ConfigMaps instead) ---
 # ----------------------------
-GSA_NAME="agentixbuddy-app-sa"
-GSA_EMAIL="${GSA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
-KSA_NAME="agentixbuddy-ksa"
+# Workload Identity requires IAM policy binding permissions.
+# Using ConfigMaps for environment variables instead.
+KSA_NAME="default"
 
-echo "Configuring Workload Identity..."
-
-# 1. Create Google Service Account if it doesn't exist
-if ! gcloud iam service-accounts describe "$GSA_EMAIL" --project "$PROJECT_ID" >/dev/null 2>&1; then
-  echo "Creating Google Service Account: $GSA_NAME"
-  gcloud iam service-accounts create "$GSA_NAME" \
-    --description="Service account for AgentixBuddy GKE pods" \
-    --display-name="AgentixBuddy App SA" \
-    --project="$PROJECT_ID"
-fi
-
-# 2. Grant roles to GSA (AI Platform User for GenAI)
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:${GSA_EMAIL}" \
-  --role="roles/aiplatform.user" \
-  --condition="None" >/dev/null
-
-# 3. Create Kubernetes Service Account
-kubectl apply -f - <<EOF
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: $KSA_NAME
-  namespace: $NAMESPACE
-  annotations:
-    iam.gke.io/gcp-service-account: $GSA_EMAIL
-EOF
-
-# 4. Bind GSA to KSA for Workload Identity
-gcloud iam service-accounts add-iam-policy-binding "$GSA_EMAIL" \
-  --project="$PROJECT_ID" \
-  --role="roles/iam.workloadIdentityUser" \
-  --member="serviceAccount:${PROJECT_ID}.svc.id.goog[${NAMESPACE}/${KSA_NAME}]" \
-  --condition="None" >/dev/null
+# # GSA_NAME="agentixbuddy-app-sa"
+# # GSA_EMAIL="${GSA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+# # KSA_NAME="agentixbuddy-ksa"
+# #
+# # echo "Configuring Workload Identity..."
+# #
+# # # 1. Create Google Service Account if it doesn't exist
+# # if ! gcloud iam service-accounts describe "$GSA_EMAIL" --project "$PROJECT_ID" >/dev/null 2>&1; then
+# #   echo "Creating Google Service Account: $GSA_NAME"
+# #   gcloud iam service-accounts create "$GSA_NAME" \
+# #     --description="Service account for AgentixBuddy GKE pods" \
+# #     --display-name="AgentixBuddy App SA" \
+# #     --project="$PROJECT_ID"
+# # fi
+# #
+# # # 2. Grant roles to GSA (AI Platform User for GenAI)
+# # gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+# #   --member="serviceAccount:${GSA_EMAIL}" \
+# #   --role="roles/aiplatform.user" \
+# #   --condition="None" >/dev/null
+# #
+# # # 3. Create Kubernetes Service Account
+# # kubectl apply -f - <<EOF
+# # apiVersion: v1
+# # kind: ServiceAccount
+# # metadata:
+# #   name: $KSA_NAME
+# #   namespace: $NAMESPACE
+# #   annotations:
+# #     iam.gke.io/gcp-service-account: $GSA_EMAIL
+# # EOF
+# #
+# # # 4. Bind GSA to KSA for Workload Identity
+# # gcloud iam service-accounts add-iam-policy-binding "$GSA_EMAIL" \
+# #   --project="$PROJECT_ID" \
+# #   --role="roles/iam.workloadIdentityUser" \
+# #   --member="serviceAccount:${PROJECT_ID}.svc.id.goog[${NAMESPACE}/${KSA_NAME}]" \
+# #   --condition="None" >/dev/null
 
 # ----------------------------
 # --- CLEANUP EXISTING RESOURCES ---
@@ -213,29 +217,34 @@ for service in $SERVICES; do
   case "$service" in
     "frontend")
       DOCKERFILE="frontend/Dockerfile"
+      BUILD_CONTEXT="frontend"
       PORT=5173
       ;;
     "host-agent")
       DOCKERFILE="backend/host_agent/Dockerfile"
+      BUILD_CONTEXT="."
       PORT=8000
       ;;
     "faq-agent")
       DOCKERFILE="backend/agents/faq_agent/Dockerfile"
+      BUILD_CONTEXT="."
       PORT=8001
       ;;
     "vector-db-service")
       DOCKERFILE="backend/services/vector_db_service/Dockerfile"
+      BUILD_CONTEXT="."
       PORT=8004
       ;;
     "guardrails-service")
       DOCKERFILE="backend/services/guardrails/Dockerfile"
+      BUILD_CONTEXT="."
       PORT=8005
       ;;
   esac
 
   IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/${service}:latest"
   echo "Building $service"
-  docker build --platform linux/amd64 -t "$IMAGE" -f "$DOCKERFILE" .
+  docker build --platform linux/amd64 -t "$IMAGE" -f "$DOCKERFILE" "$BUILD_CONTEXT"
   echo "Pushing $service"
   docker push "$IMAGE"
 
@@ -246,6 +255,15 @@ for service in $SERVICES; do
 
   # Add service-specific environment variables
   case "$service" in
+    "frontend")
+      EXTRA_ENV_VARS=$(cat <<'YAML'
+            - name: VITE_API_URL
+              value: /api
+            - name: VITE_VECTOR_DB_URL
+              value: /vector-db/vector_db_service
+YAML
+)
+      ;;
     "host-agent")
       EXTRA_ENV_VARS=$(cat <<'YAML'
             - name: FAQ_AGENT_URL
@@ -296,7 +314,6 @@ spec:
       labels:
         app: $service
     spec:
-      serviceAccountName: $KSA_NAME
       nodeSelector:
         cloud.google.com/gke-spot: "true"
       containers:
