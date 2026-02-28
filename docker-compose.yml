@@ -14,7 +14,7 @@ services:
     depends_on:
       - host-agent
     environment:
-      - VITE_API_URL=http://host-agent:8000
+      - VITE_API_URL=http://localhost:8000
     command: [ "npm", "run", "dev", "--", "--host", "0.0.0.0" ]
 
   host-agent:
@@ -62,7 +62,7 @@ services:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production-min-32-chars
       - JWT_EXPIRE_MINUTES=480
-      - VECTOR_DB_SERVICE_URL=http://vector-db-service:8004
+      - VECTOR_DB_SERVICE_URL=http://localhost:8004/vector_db_service
       - PORT=8001
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
@@ -116,15 +116,26 @@ services:
     command: >
       python -m uvicorn backend.bank_server.server:bank_app --host 0.0.0.0 --port 8006 --reload --log-level debug --use-colors
 
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
   vector-db-service:
     build:
       context: .
-      dockerfile: backend/vector_db_service/Dockerfile
+      dockerfile: backend/services/vector_db_service/Dockerfile
     container_name: vector-db-service
     ports:
       - "8004:8004"
     volumes:
       - ./backend:/app/backend
+    depends_on:
+      - qdrant
     environment:
       - PYTHONUNBUFFERED=1
       - UVICORN_LOG_LEVEL=debug
@@ -132,14 +143,15 @@ services:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production-min-32-chars
       - JWT_EXPIRE_MINUTES=480
-      - QDRANT_URL=https://2580c3f4-7869-40a8-b26b-3087029a69b1.europe-west3-0.gcp.cloud.qdrant.io:6333
-      - QDRANT_API_KEY=${QDRANT_API_KEY}
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_API_KEY=
+      - VECTOR_DB_COLLECTION=sample_bank_products
       - PORT=8004
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
       - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL}
     command: >
-      python -m uvicorn backend.vector_db_service.server:vector_db_app --host 0.0.0.0 --port 8004 --reload --log-level debug --use-colors
+      python -m uvicorn backend.services.vector_db_service.server:vector_db_app --host 0.0.0.0 --port 8004 --reload --log-level debug --use-colors
 
   guardrails-service:
     build:
@@ -155,3 +167,6 @@ services:
       - PORT=8005
     command: >
       python -m backend.services.guardrails.server
+
+volumes:
+  qdrant_data:

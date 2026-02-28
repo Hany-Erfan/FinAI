@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import LoginForm from './pages/LoginForm';
 import ProtectedRoute from './pages/ProtectedRoute';
 import ChatPage from './pages/ChatPage';
+import Backoffice from './pages/Backoffice';
 import { getCurrentUser, login, logout } from './api/login';
 
 const TAB_SESSION_KEY = "chat_tab_session_id";
@@ -125,6 +126,14 @@ export default function App() {
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated}>
               <ChatPage auth={auth} onLogout={handleLogout} sessionId={sessionId} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/backoffice"
+          element={
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredRole="admin" userRole={auth?.role}>
+              <Backoffice sessionId={sessionId} />
             </ProtectedRoute>
           }
         />

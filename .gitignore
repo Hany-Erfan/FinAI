@@ -109,3 +109,6 @@ data/
 #frontend
 node_modules/
 .vite/
+
+# Claude Code
+.claude/

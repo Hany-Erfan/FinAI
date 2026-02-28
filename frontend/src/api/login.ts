@@ -32,23 +32,6 @@ export async function getCurrentUser(sessionId) {
   return response.json();
 }
 
-
-export async function showAdminManagement(sessionId) {
-  const response = await fetch(`${Endpoints.ADMIN_MANAGEMENT}`, {
-    headers: {
-      ...sessionHeaders(sessionId),
-    },
-    credentials: "include",
-  });
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({ detail: "Unauthorized" }));
-    throw new Error(err.detail || "Unauthorized");
-  }
-
-  return response.json();
-}
-
 export async function logout(sessionId) {
   await fetch(`${Endpoints.LOGOUT}`, {
     method: "POST",
