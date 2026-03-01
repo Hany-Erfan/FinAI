@@ -2,20 +2,22 @@
 set -e
 
 # ----------------------------
-# --- GCloud Auth & Cluster ---
-# ----------------------------
-
-gcloud auth login --quiet
-gcloud config set project agentixbuddy-dev
-
-# ----------------------------
 # --- Cluster Configuration ---
 # ----------------------------
-PROJECT_ID="agentixbuddy-dev"
-REGION="europe-west3"
-REPO="agentixbuddy-repo"
-NAMESPACE="agentixbuddy"
-CLUSTER_NAME="agentixbuddy-cluster"
+# These can be overridden via environment variables
+PROJECT_ID="${GCP_PROJECT_ID:-agentixbuddy-dev}"
+REGION="${GCP_REGION:-europe-west3}"
+REPO="${GCP_REPO:-agentixbuddy-repo}"
+NAMESPACE="${K8S_NAMESPACE:-agentixbuddy}"
+CLUSTER_NAME="${GKE_CLUSTER_NAME:-agentixbuddy-cluster}"
+
+# ----------------------------
+# --- GCloud Auth & Cluster ---
+# ----------------------------
+echo "Using project: $PROJECT_ID, region: $REGION, cluster: $CLUSTER_NAME"
+
+gcloud auth login --quiet
+gcloud config set project $PROJECT_ID
 
 # ----------------------------
 # --- Create/Get GKE Cluster ---
