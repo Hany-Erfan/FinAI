@@ -31,6 +31,7 @@ services:
         condition: service_started
       guardrails-service:
         condition: service_healthy
+      - postgres_db
     environment:
       - PYTHONUNBUFFERED=1
       - UVICORN_LOG_LEVEL=debug
@@ -40,6 +41,7 @@ services:
       - JWT_EXPIRE_MINUTES=480
       - FAQ_AGENT_URL=http://faq-agent:8001
       - RETAIL_AGENT_URL=http://retail-agent:8002
+      - SUMMARY_AGENT_URL=http://summary-agent:8003
       - BANK_URL=http://bank-server:8006
       - PORT=8000
       - GUARDRAILS_URL=http://guardrails-service:8005
@@ -98,6 +100,37 @@ services:
       - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL}
     command: >
       python -m uvicorn backend.agents.retail_agent.server:retail_app --host 0.0.0.0 --port 8002 --reload --log-level debug --use-colors
+
+  summary-agent:
+    build:
+      context: .
+      dockerfile: backend/agents/summary_agent/Dockerfile
+    container_name: summary-agent
+    ports:
+      - "8003:8003"
+    volumes:
+      - ./backend:/app/backend
+    environment:
+      - PYTHONUNBUFFERED=1
+      - UVICORN_LOG_LEVEL=debug
+      - LOG_LEVEL=debug
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production-min-32-chars
+      - JWT_EXPIRE_MINUTES=480
+      - PORT=8003
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL}
+    command: >
+      python -m uvicorn backend.agents.summary_agent.server:summary_app --host 0.0.0.0 --port 8003 --reload --log-level debug --use-colors
+
+  db:
+    build:
+      context: .
+      dockerfile: backend/postgres_db/Dockerfile
+    container_name: db
+    volumes:
+      - ./backend:/app/backend
 
   bank-server:
     build:
@@ -187,6 +220,24 @@ services:
       start_period: 30s
     command: >
       python -m backend.services.guardrails.server
+
+  postgres_db:
+    image: postgres:16
+    container_name: app_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-agentixBuddy}
+      POSTGRES_USER: ${POSTGRES_USER:-agentixBuddy}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    #volumes:
+     # - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agentixBuddy} -d ${POSTGRES_DB:-agentixBuddy}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
 
 volumes:
   qdrant_data:

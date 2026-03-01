@@ -7,6 +7,10 @@ import secrets
 import traceback
 from typing import Optional
 import httpx
+from backend.common.masking_pii import DataMasker
+from backend.postgres_db.database import get_db, init_db
+from backend.postgres_db.models import MessageRole
+from backend.postgres_db.repository import SessionRepository
 import uvicorn
 from fastapi import FastAPI, HTTPException, Depends, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -213,6 +217,8 @@ async def get_response_from_agent(message: str, user_id: str, session_id: str) -
         traceback.print_exc()
         return f"An error occurred while processing your request: {str(e)}"
 
+def get_chat_respository(db = Depends(get_db)) -> SessionRepository:
+    return SessionRepository(db = db, masker= DataMasker())
 def detect_language(text: str) -> str:
     # Lightweight script-based detection (Arabic vs default English)
     # Arabic Unicode blocks: \u0600-\u06FF, \u0750-\u077F, \u08A0-\u08FF
@@ -227,7 +233,7 @@ def detect_language(text: str) -> str:
 # =========================
 
 @app.post("/login", response_model=LoginResponse, tags=["login"])
-def login(payload: LoginRequest, response: Response) -> LoginResponse:
+def login(payload: LoginRequest, response: Response, repo = Depends(get_chat_respository)) -> LoginResponse:
     if not payload.session_id.strip():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Session id required")
 
@@ -246,6 +252,13 @@ def login(payload: LoginRequest, response: Response) -> LoginResponse:
 
     csrf_token = secrets.token_urlsafe(32)
     refresh_session_cookies(response, user, payload.session_id, csrf_token)
+
+    # init session
+    repo.create_session(
+            customer_id=user["user_id"],
+            customer_name=payload.username,
+            session_id=payload.session_id,
+        )
     return LoginResponse(
         message="Login successful",
         role=user["role"],
@@ -269,6 +282,7 @@ def logout(
     response: Response,
     current_user=Depends(get_current_user),
     _: None = Depends(verify_csrf),
+    repo = Depends(get_chat_respository)
 ) -> dict:
     del current_user, _
     session_id = request.headers.get("X-Session-Id")
@@ -276,24 +290,17 @@ def logout(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing session id")
     response.delete_cookie(key=auth_cookie_name(session_id), path="/")
     response.delete_cookie(key=csrf_cookie_name(session_id), path="/")
+
+    #end session
+    repo.end_session(session_id)
     return {"message": "Logged out"}
-
-
-@app.get("/admin/management", tags=["Admin"])
-def admin_panel(current_user=Depends(require_admin)) -> dict:
-    return {
-        "message": "Welcome to admin management",
-        "user_id": current_user.get("user_id"),
-        "username": current_user["username"],
-        "role": current_user["role"],
-}
-
 
 @app.post("/chat", response_model=ChatResponse, tags=["Chat"])
 async def chat_endpoint(
     request: ChatRequest,
     current_user=Depends(get_current_user),
     _: None = Depends(verify_csrf),
+    repo = Depends(get_chat_respository)
 ):
     try:        
 
@@ -312,6 +319,15 @@ async def chat_endpoint(
             )
 
         session_id = request.session_id
+
+        # Mask user's message before DB storage 
+        #masked_user_message = repo.masker.mask(request.message)
+        repo.save_message(
+            session_id=session_id,
+            role=MessageRole.USER,
+            content=request.message,
+        )
+        print('masked', request.message)
 
         # 3) Create/update ADK session state
         session = await SESSION_SERVICE.get_session(
@@ -354,6 +370,15 @@ async def chat_endpoint(
 
         # If the agent responded in Arabic, prefer that for downstream messages
         lang = detect_language(response_text or request.message or "")
+        # Mask model reply before DB storage
+       # masked_reply = repo.masker.mask(response_text)
+       # print('masked_reply', masked_reply)
+
+        repo.save_message(
+            session_id=session_id,
+            role=MessageRole.MODEL,
+            content=response_text,
+        )
 
         # 5) Guardrails output
         is_safe_output, filtered = await check_guardrails_output(response_text)
@@ -395,6 +420,9 @@ async def startup_event():
         session_id=DEFAULT_SESSION_ID,
     )
 
+    logger.info("Initializing Database...")
+    init_db()
+    
     logger.info("Initializing Runner...")
     ROUTING_AGENT_RUNNER = Runner(
         agent=routing_agent_module.root_agent,  # initialized by init_routing_agent()
