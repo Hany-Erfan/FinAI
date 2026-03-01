@@ -1,4 +1,4 @@
-.PHONY: help up down restart logs status deploy-cluster deploy-status deploy-logs deploy-cost-estimate teardown-cluster
+.PHONY: help up down restart logs status build rebuild deploy-cluster deploy-status deploy-logs deploy-cost-estimate teardown-cluster deploy-service deploy-frontend deploy-host-agent deploy-faq-agent
 
 # Load environment variables (POSIX-safe)
 ifneq (,$(wildcard .env))
@@ -84,3 +84,47 @@ deploy-cost-estimate: ## Show estimated GKE costs and resource breakdown
 	@echo ""
 	@echo "Estimated Monthly Cost: Visit https://cloud.google.com/products/calculator"
 	@echo "Autopilot charges: ~\$$0.0445/vCPU-hour, ~\$$0.00491/GB-hour"
+
+# ============================================
+# Individual Service Deployments (for updates)
+# ============================================
+
+PROJECT_ID=agentixbuddy-dev
+REGION=europe-west3
+REPO=agentixbuddy-repo
+NAMESPACE=agentixbuddy
+
+deploy-frontend: ## Rebuild and deploy frontend only
+	@echo "Building and pushing frontend..."
+	docker build --no-cache --platform linux/amd64 -t $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPO)/frontend:latest -f frontend/Dockerfile frontend
+	docker push $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPO)/frontend:latest
+	kubectl delete pod -l app=frontend -n $(NAMESPACE)
+	kubectl rollout status deployment/frontend -n $(NAMESPACE) --timeout=120s
+
+deploy-host-agent: ## Rebuild and deploy host-agent only
+	@echo "Building and pushing host-agent..."
+	docker build --no-cache --platform linux/amd64 -t $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPO)/host-agent:latest -f backend/host_agent/Dockerfile .
+	docker push $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPO)/host-agent:latest
+	kubectl delete pod -l app=host-agent -n $(NAMESPACE)
+	kubectl rollout status deployment/host-agent -n $(NAMESPACE) --timeout=120s
+
+deploy-faq-agent: ## Rebuild and deploy faq-agent only
+	@echo "Building and pushing faq-agent..."
+	docker build --no-cache --platform linux/amd64 -t $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPO)/faq-agent:latest -f backend/agents/faq_agent/Dockerfile .
+	docker push $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPO)/faq-agent:latest
+	kubectl delete pod -l app=faq-agent -n $(NAMESPACE)
+	kubectl rollout status deployment/faq-agent -n $(NAMESPACE) --timeout=120s
+
+deploy-vector-db: ## Rebuild and deploy vector-db-service only
+	@echo "Building and pushing vector-db-service..."
+	docker build --no-cache --platform linux/amd64 -t $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPO)/vector-db-service:latest -f backend/services/vector_db_service/Dockerfile .
+	docker push $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPO)/vector-db-service:latest
+	kubectl delete pod -l app=vector-db-service -n $(NAMESPACE)
+	kubectl rollout status deployment/vector-db-service -n $(NAMESPACE) --timeout=120s
+
+deploy-guardrails: ## Rebuild and deploy guardrails-service only
+	@echo "Building and pushing guardrails-service..."
+	docker build --no-cache --platform linux/amd64 -t $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPO)/guardrails-service:latest -f backend/services/guardrails/Dockerfile .
+	docker push $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPO)/guardrails-service:latest
+	kubectl delete pod -l app=guardrails-service -n $(NAMESPACE)
+	kubectl rollout status deployment/guardrails-service -n $(NAMESPACE) --timeout=120s

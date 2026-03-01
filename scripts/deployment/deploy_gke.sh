@@ -287,7 +287,7 @@ YAML
     "faq-agent")
       EXTRA_ENV_VARS=$(cat <<'YAML'
             - name: VECTOR_DB_SERVICE_URL
-              value: http://vector-db-service:8004/vector_db_service
+              value: http://vector-db-service:8004
 YAML
 )
       ;;
