@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+K8S_DIR="$SCRIPT_DIR/k8s"
+
 # ----------------------------
 # --- Load .env file first ---
 # ----------------------------
@@ -48,7 +51,7 @@ gcloud container clusters get-credentials $CLUSTER_NAME --region $REGION
 # ----------------------------
 # --- Reserve/Get Static IP for Ingress LoadBalancer ---
 # ----------------------------
-STATIC_IP_NAME="agentixbuddy-ingress-ip"
+STATIC_IP_NAME="${GKE_STATIC_IP_NAME:-agentixbuddy-ingress-ip}"
 if ! gcloud compute addresses describe "$STATIC_IP_NAME" --region "$REGION" >/dev/null 2>&1; then
   echo "Static IP not found. Creating static IP: $STATIC_IP_NAME ..."
   gcloud compute addresses create "$STATIC_IP_NAME" --region "$REGION"
@@ -82,52 +85,6 @@ kubectl create configmap app-env \
   --dry-run=client -o yaml | kubectl apply -f -
 
 # ----------------------------
-# --- Configure Workload Identity (SKIPPED - using ConfigMaps instead) ---
-# ----------------------------
-# Workload Identity requires IAM policy binding permissions.
-# Using ConfigMaps for environment variables instead.
-KSA_NAME="default"
-
-# # GSA_NAME="agentixbuddy-app-sa"
-# # GSA_EMAIL="${GSA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
-# # KSA_NAME="agentixbuddy-ksa"
-# #
-# # echo "Configuring Workload Identity..."
-# #
-# # # 1. Create Google Service Account if it doesn't exist
-# # if ! gcloud iam service-accounts describe "$GSA_EMAIL" --project "$PROJECT_ID" >/dev/null 2>&1; then
-# #   echo "Creating Google Service Account: $GSA_NAME"
-# #   gcloud iam service-accounts create "$GSA_NAME" \
-# #     --description="Service account for AgentixBuddy GKE pods" \
-# #     --display-name="AgentixBuddy App SA" \
-# #     --project="$PROJECT_ID"
-# # fi
-# #
-# # # 2. Grant roles to GSA (AI Platform User for GenAI)
-# # gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-# #   --member="serviceAccount:${GSA_EMAIL}" \
-# #   --role="roles/aiplatform.user" \
-# #   --condition="None" >/dev/null
-# #
-# # # 3. Create Kubernetes Service Account
-# # kubectl apply -f - <<EOF
-# # apiVersion: v1
-# # kind: ServiceAccount
-# # metadata:
-# #   name: $KSA_NAME
-# #   namespace: $NAMESPACE
-# #   annotations:
-# #     iam.gke.io/gcp-service-account: $GSA_EMAIL
-# # EOF
-# #
-# # # 4. Bind GSA to KSA for Workload Identity
-# # gcloud iam service-accounts add-iam-policy-binding "$GSA_EMAIL" \
-# #   --project="$PROJECT_ID" \
-# #   --role="roles/iam.workloadIdentityUser" \
-# #   --member="serviceAccount:${PROJECT_ID}.svc.id.goog[${NAMESPACE}/${KSA_NAME}]" \
-# #   --condition="None" >/dev/null
-
-# ----------------------------
 # --- CLEANUP EXISTING RESOURCES ---
 # ----------------------------
 echo "Cleaning up all deployments, statefulsets, jobs, pods, services, PVCs in $NAMESPACE..."
@@ -141,238 +98,45 @@ kubectl delete pvc --all -n $NAMESPACE --ignore-not-found
 # ----------------------------
 # --- Deploy Qdrant (Vector Database) ---
 # ----------------------------
-kubectl apply -n $NAMESPACE -f - <<EOF
-apiVersion: v1
-kind: Service
-metadata:
-  name: qdrant
-spec:
-  clusterIP: None
-  selector:
-    app: qdrant
-  ports:
-    - name: http
-      port: 6333
-      targetPort: 6333
-    - name: grpc
-      port: 6334
-      targetPort: 6334
----
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: qdrant
-spec:
-  serviceName: qdrant
-  replicas: 1
-  selector:
-    matchLabels:
-      app: qdrant
-  template:
-    metadata:
-      labels:
-        app: qdrant
-    spec:
-      nodeSelector:
-        cloud.google.com/gke-spot: "true"
-      containers:
-        - name: qdrant
-          image: qdrant/qdrant:latest
-          ports:
-            - containerPort: 6333
-            - containerPort: 6334
-          resources:
-            requests:
-              cpu: 250m
-              memory: 512Mi
-            limits:
-              cpu: 500m
-              memory: 1Gi
-          volumeMounts:
-            - name: qdrant-data
-              mountPath: /qdrant/storage
-          readinessProbe:
-            tcpSocket:
-              port: 6333
-            initialDelaySeconds: 5
-            periodSeconds: 5
-  volumeClaimTemplates:
-    - metadata:
-        name: qdrant-data
-      spec:
-        accessModes: ["ReadWriteOnce"]
-        resources:
-          requests:
-            storage: 5Gi
-EOF
+echo "Deploying Qdrant..."
+kubectl apply -n $NAMESPACE -f "$K8S_DIR/qdrant.yaml"
 
 # Wait for Qdrant to be ready
 echo "Waiting for Qdrant to be ready..."
 kubectl rollout status statefulset/qdrant -n $NAMESPACE --timeout=300s
 
 # ----------------------------
-# --- Build and Push Custom Services ---
+# --- Build and Deploy Services ---
 # ----------------------------
-# List of services to build and deploy
-SERVICES="frontend host-agent faq-agent vector-db-service guardrails-service"
+declare -A SERVICES=(
+  ["frontend"]="frontend/Dockerfile:frontend"
+  ["host-agent"]="backend/host_agent/Dockerfile:."
+  ["faq-agent"]="backend/agents/faq_agent/Dockerfile:."
+  ["vector-db-service"]="backend/services/vector_db_service/Dockerfile:."
+  ["guardrails-service"]="backend/services/guardrails/Dockerfile:."
+)
 
-for service in $SERVICES; do
-  # Define per-service variables
-  case "$service" in
-    "frontend")
-      DOCKERFILE="frontend/Dockerfile"
-      BUILD_CONTEXT="frontend"
-      PORT=5173
-      ;;
-    "host-agent")
-      DOCKERFILE="backend/host_agent/Dockerfile"
-      BUILD_CONTEXT="."
-      PORT=8000
-      ;;
-    "faq-agent")
-      DOCKERFILE="backend/agents/faq_agent/Dockerfile"
-      BUILD_CONTEXT="."
-      PORT=8001
-      ;;
-    "vector-db-service")
-      DOCKERFILE="backend/services/vector_db_service/Dockerfile"
-      BUILD_CONTEXT="."
-      PORT=8004
-      ;;
-    "guardrails-service")
-      DOCKERFILE="backend/services/guardrails/Dockerfile"
-      BUILD_CONTEXT="."
-      PORT=8005
-      ;;
-  esac
+for service in "${!SERVICES[@]}"; do
+  IFS=':' read -r DOCKERFILE BUILD_CONTEXT <<< "${SERVICES[$service]}"
 
   IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/${service}:latest"
-  echo "Building $service"
+
+  echo "Building $service..."
   docker build --platform linux/amd64 -t "$IMAGE" -f "$DOCKERFILE" "$BUILD_CONTEXT"
-  echo "Pushing $service"
+
+  echo "Pushing $service..."
   docker push "$IMAGE"
 
-  # ----------------------------
-  # --- Deploy Custom Services ---
-  # ----------------------------
-  EXTRA_ENV_VARS=""
-
-  # Add service-specific environment variables
-  case "$service" in
-    "frontend")
-      EXTRA_ENV_VARS=$(cat <<'YAML'
-            - name: VITE_API_URL
-              value: /api
-            - name: VITE_VECTOR_DB_URL
-              value: /vector-db/vector_db_service
-YAML
-)
-      ;;
-    "host-agent")
-      EXTRA_ENV_VARS=$(cat <<'YAML'
-            - name: FAQ_AGENT_URL
-              value: http://faq-agent:8001
-            - name: GUARDRAILS_URL
-              value: http://guardrails-service:8005
-YAML
-)
-      ;;
-    "vector-db-service")
-      EXTRA_ENV_VARS=$(cat <<'YAML'
-            - name: QDRANT_URL
-              value: http://qdrant:6333
-            - name: QDRANT_API_KEY
-              value: ""
-            - name: VECTOR_DB_COLLECTION
-              value: sample_bank_products
-YAML
-)
-      ;;
-    "faq-agent")
-      EXTRA_ENV_VARS=$(cat <<'YAML'
-            - name: VECTOR_DB_SERVICE_URL
-              value: http://vector-db-service:8004
-YAML
-)
-      ;;
-  esac
-
-  # Set resource requests based on service type
-  RESOURCE_REQUESTS="cpu: 100m
-              memory: 256Mi"
-  RESOURCE_LIMITS="cpu: 200m
-              memory: 512Mi"
-
-  kubectl apply -n $NAMESPACE -f - <<EOF
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: $service
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: $service
-  template:
-    metadata:
-      labels:
-        app: $service
-    spec:
-      nodeSelector:
-        cloud.google.com/gke-spot: "true"
-      containers:
-        - name: $service
-          image: ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/${service}:latest
-          ports:
-            - containerPort: ${PORT}
-          envFrom:
-            - configMapRef:
-                name: app-env
-          env:
-            - name: PYTHONUNBUFFERED
-              value: "1"
-$EXTRA_ENV_VARS
-          resources:
-            requests:
-              $RESOURCE_REQUESTS
-            limits:
-              $RESOURCE_LIMITS
-EOF
-
-  # --- EXPOSE SERVICES ---
-  if [ "$service" == "frontend" ]; then
-    kubectl delete svc frontend -n "$NAMESPACE" --ignore-not-found
-
-    kubectl apply -n "$NAMESPACE" -f - <<EOF
-apiVersion: v1
-kind: Service
-metadata:
-  name: frontend
-spec:
-  type: ClusterIP
-  selector:
-    app: frontend
-  ports:
-    - port: 80
-      targetPort: ${PORT}
-      protocol: TCP
-EOF
-  else
-    kubectl expose deployment "$service" \
-      --type=ClusterIP \
-      --port="${PORT}" \
-      --target-port="${PORT}" \
-      -n "$NAMESPACE" \
-      --dry-run=client -o yaml | kubectl apply -f -
-  fi
-
+  echo "Deploying $service..."
+  # Replace IMAGE_PLACEHOLDER with actual image and apply
+  sed "s|IMAGE_PLACEHOLDER|$IMAGE|g" "$K8S_DIR/${service}.yaml" | kubectl apply -n $NAMESPACE -f -
 done
 
 # ----------------------------
 # --- Deploy Gateway (Nginx) ---
 # ----------------------------
 echo "Deploying Gateway with static IP: $INGRESS_STATIC_IP"
-sed "s/STATIC_IP_PLACEHOLDER/$INGRESS_STATIC_IP/g" scripts/deployment/custom_gateway.yaml | kubectl apply -f -
+sed "s/STATIC_IP_PLACEHOLDER/$INGRESS_STATIC_IP/g" "$K8S_DIR/gateway.yaml" | kubectl apply -n $NAMESPACE -f -
 
 echo ""
 echo "--------------------------------------------------------"

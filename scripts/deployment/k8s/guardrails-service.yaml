@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: guardrails-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: guardrails-service
+  template:
+    metadata:
+      labels:
+        app: guardrails-service
+    spec:
+      nodeSelector:
+        cloud.google.com/gke-spot: "true"
+      containers:
+        - name: guardrails-service
+          image: IMAGE_PLACEHOLDER
+          ports:
+            - containerPort: 8005
+          envFrom:
+            - configMapRef:
+                name: app-env
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 200m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: guardrails-service
+spec:
+  type: ClusterIP
+  selector:
+    app: guardrails-service
+  ports:
+    - port: 8005
+      targetPort: 8005
+      protocol: TCP

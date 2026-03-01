@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      nodeSelector:
+        cloud.google.com/gke-spot: "true"
+      containers:
+        - name: frontend
+          image: IMAGE_PLACEHOLDER
+          ports:
+            - containerPort: 5173
+          envFrom:
+            - configMapRef:
+                name: app-env
+          env:
+            - name: VITE_API_URL
+              value: /api
+            - name: VITE_VECTOR_DB_URL
+              value: /vector-db/vector_db_service
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 200m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 5173
+      protocol: TCP
