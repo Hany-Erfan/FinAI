@@ -2,9 +2,21 @@
 set -e
 
 # ----------------------------
+# --- Load .env file first ---
+# ----------------------------
+if [ -f .env ]; then
+  echo "Loading environment from .env file..."
+  set -a
+  source .env
+  set +a
+else
+  echo "No .env file found, using defaults"
+fi
+
+# ----------------------------
 # --- Cluster Configuration ---
 # ----------------------------
-# These can be overridden via environment variables
+# These can be overridden via .env or environment variables
 PROJECT_ID="${GCP_PROJECT_ID:-agentixbuddy-dev}"
 REGION="${GCP_REGION:-europe-west3}"
 REPO="${GCP_REPO:-agentixbuddy-repo}"
@@ -45,16 +57,6 @@ else
 fi
 INGRESS_STATIC_IP=$(gcloud compute addresses describe "$STATIC_IP_NAME" --region "$REGION" --format="get(address)")
 echo "Ingress static IP: $INGRESS_STATIC_IP"
-
-# Load environment variables from .env if it exists
-if [ -f .env ]; then
-  echo "Loading environment from .env file..."
-  set -a
-  source .env
-  set +a
-else
-  echo "No .env file found, using GCP-provided configuration"
-fi
 
 # Authenticate Docker to Artifact Registry
 gcloud auth configure-docker ${REGION}-docker.pkg.dev

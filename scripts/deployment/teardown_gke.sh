@@ -1,7 +1,16 @@
 #!/bin/bash
 set -e
 
-# Configuration - can be overridden via environment variables
+# ----------------------------
+# --- Load .env file first ---
+# ----------------------------
+if [ -f .env ]; then
+  set -a
+  source .env
+  set +a
+fi
+
+# Configuration - can be overridden via .env or environment variables
 PROJECT_ID="${GCP_PROJECT_ID:-agentixbuddy-dev}"
 REGION="${GCP_REGION:-europe-west3}"
 CLUSTER_NAME="${GKE_CLUSTER_NAME:-agentixbuddy-cluster}"
