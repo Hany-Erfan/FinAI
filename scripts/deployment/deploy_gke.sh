@@ -51,7 +51,7 @@ gcloud container clusters get-credentials $CLUSTER_NAME --region $REGION
 # ----------------------------
 # --- Reserve/Get Static IP for Ingress LoadBalancer ---
 # ----------------------------
-STATIC_IP_NAME="${GKE_STATIC_IP_NAME:-agentixbuddy-ingress-ip}"
+STATIC_IP_NAME="agentixbuddy-ingress-ip"
 if ! gcloud compute addresses describe "$STATIC_IP_NAME" --region "$REGION" >/dev/null 2>&1; then
   echo "Static IP not found. Creating static IP: $STATIC_IP_NAME ..."
   gcloud compute addresses create "$STATIC_IP_NAME" --region "$REGION"
@@ -108,16 +108,32 @@ kubectl rollout status statefulset/qdrant -n $NAMESPACE --timeout=300s
 # ----------------------------
 # --- Build and Deploy Services ---
 # ----------------------------
-declare -A SERVICES=(
-  ["frontend"]="frontend/Dockerfile:frontend"
-  ["host-agent"]="backend/host_agent/Dockerfile:."
-  ["faq-agent"]="backend/agents/faq_agent/Dockerfile:."
-  ["vector-db-service"]="backend/services/vector_db_service/Dockerfile:."
-  ["guardrails-service"]="backend/services/guardrails/Dockerfile:."
-)
+SERVICES="frontend host-agent faq-agent vector-db-service guardrails-service"
 
-for service in "${!SERVICES[@]}"; do
-  IFS=':' read -r DOCKERFILE BUILD_CONTEXT <<< "${SERVICES[$service]}"
+for service in $SERVICES; do
+  # Define per-service variables
+  case "$service" in
+    "frontend")
+      DOCKERFILE="frontend/Dockerfile"
+      BUILD_CONTEXT="frontend"
+      ;;
+    "host-agent")
+      DOCKERFILE="backend/host_agent/Dockerfile"
+      BUILD_CONTEXT="."
+      ;;
+    "faq-agent")
+      DOCKERFILE="backend/agents/faq_agent/Dockerfile"
+      BUILD_CONTEXT="."
+      ;;
+    "vector-db-service")
+      DOCKERFILE="backend/services/vector_db_service/Dockerfile"
+      BUILD_CONTEXT="."
+      ;;
+    "guardrails-service")
+      DOCKERFILE="backend/services/guardrails/Dockerfile"
+      BUILD_CONTEXT="."
+      ;;
+  esac
 
   IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/${service}:latest"
 
