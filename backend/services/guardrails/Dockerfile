@@ -20,12 +20,16 @@ ENV UV_HTTP_TIMEOUT=300
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install --system -r pyproject.toml
 
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system google-generativeai
+
 # Copy the entire backend directory structure
 COPY backend/ ./backend/
 
 # Accept the API key as a build argument
 ARG GUARDRAILS_API_KEY
 ENV GUARDRAILS_API_KEY=$GUARDRAILS_API_KEY
+ENV GUARDRAILS_LLM_MODEL=$GUARDRAILS_LLM_MODEL
 ENV UV_SYSTEM_PYTHON=1
 
 # Configure Guardrails and install Hub packages

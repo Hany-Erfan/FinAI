@@ -23,6 +23,7 @@ from typing import Optional, Callable, Tuple
 
 import uvicorn
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from guardrails import Guard
@@ -47,6 +48,18 @@ app = FastAPI(
     version="1.4.0",
 )
 
+# --- CORS (frontend at :5173 calling this service at :8005) ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 class ValidationRequest(BaseModel):
     message: str
@@ -56,6 +69,28 @@ class ValidationResponse(BaseModel):
     is_safe: bool
     filtered_message: Optional[str] = None
     reason: Optional[str] = None
+
+
+# ---------------------------------------------------------
+# Dynamic Threshold Configurations
+# ---------------------------------------------------------
+
+class ThresholdState:
+    restrict_to_topic: float = 0.25
+    toxic_language: float = 0.6
+    gibberish_text: float = 0.6
+
+thresholds = ThresholdState()
+
+class ThresholdUpdateRequest(BaseModel):
+    restrict_to_topic: Optional[float] = None
+    toxic_language: Optional[float] = None
+    gibberish_text: Optional[float] = None
+
+class ThresholdResponse(BaseModel):
+    restrict_to_topic: float
+    toxic_language: float
+    gibberish_text: float
 
 
 # ---------------------------------------------------------
@@ -124,81 +159,22 @@ class IsSafeOutput(Validator):
 PII_ENTITIES = ["EMAIL_ADDRESS", "PHONE_NUMBER", "CREDIT_CARD", "IBAN_CODE", "US_SSN"]
 
 # Broader, more realistic banking topics/phrases + greetings/small talk so basic chat isn't blocked
+# RestrictToTopic works best with short semantic topic labels (categories),
+# not greetings/keywords/phrases.
 VALID_TOPICS = [
-    # greetings / small talk
-    "greeting",
-    "hello",
-    "hi",
-    "hey",
-    "good morning",
-    "good afternoon",
-    "good evening",
-    "how are you",
-    "what's up",
-    "whats up",
-    "thanks",
-    "thank you",
-    "bye",
-    "goodbye",
-
-    # broad umbrella terms
-    "banking",
-    "retail banking",
-    "customer support",
-    "help",
-    "account help",
-    "online banking",
-    "mobile banking",
-
-    # auth/login
-    "login",
-    "log in",
-    "sign in",
-    "password",
-    "password reset",
-    "username",
-    "locked account",
-    "access",
-
-    # general info
-    "bank hours",
-    "opening hours",
-    "branch location",
-    "branch",
-    "atm",
-    "routing number",
-    "swift",
-    "iban",
-    "fees",
-
-    # accounts & transfers (general)
-    "bank account",
-    "checking account",
-    "savings account",
-    "account balance",
-    "transactions",
-    "transaction history",
+    "bank accounts",
+    "online banking access",
+    "login and password reset",
+    "account balances and transactions",
     "deposits",
-    "direct deposit",
-    "check deposit",
-    "transfer",
-    "wire transfer",
-    "international transfer",
-    "card",
-    "debit card",
-    "credit card",
-    "dispute",
-    "chargeback",
-
-    # onboarding/products
-    "open account",
-    "opening an account",
-    "onboarding",
-    "sign up",
-    "register",
-    "apply",
-    "loan",
-    "mortgage",
+    "payments and transfers",
+    "wire transfers",
+    "bank cards",
+    "fees and charges",
+    "branch and atm information",
+    "routing number and swift/iban",
+    "opening a new account",
+    "loans and mortgages",
 ]
 
 
@@ -252,6 +228,9 @@ def startup_event() -> None:
     # Uses BOTH fixes:
     #  1) expanded VALID_TOPICS including greetings/small talk
     #  2) RestrictToTopic is soft (on_fail="noop") so casual chat isn't blocked
+        # Decide whether RestrictToTopic should hard-block or soft-fail based on slider
+    restrict_on_fail = "exception" if thresholds.restrict_to_topic >= 0.5 else "noop"
+
     input_guard = (
         Guard()
         .use(
@@ -266,19 +245,20 @@ def startup_event() -> None:
                 disable_classifier=False,
                 disable_llm=not use_llm,
                 llm_callable=llm_callable if use_llm else None,
-                model_threshold=0.25,   # more permissive
-                on_fail="noop",         # soft fail: don't block greetings/small talk
+                model_threshold=thresholds.restrict_to_topic,
+                on_fail=restrict_on_fail,
             ),
 
             DetectPII(pii_entities=PII_ENTITIES, on_fail="exception"),
 
             # Don't hard-block on secrets for normal user messages
-            SecretsPresent(on_fail="noop"),
+            SecretsPresent(on_fail="exception"),
 
-            ToxicLanguage(threshold=0.6, validation_method="sentence", on_fail="exception"),
-            GibberishText(threshold=0.6, validation_method="sentence", on_fail="exception"),
+            ToxicLanguage(threshold=thresholds.toxic_language, validation_method="sentence", on_fail="exception"),
+            GibberishText(threshold=thresholds.gibberish_text, validation_method="sentence", on_fail="exception"),
         )
     )
+
 
     # OUTPUT (keep strict)
     output_guard = (
@@ -300,24 +280,37 @@ def _extract_reason(exc: Exception) -> str:
     msg = str(exc).strip()
     return msg or "Validation failed."
 
-
 @app.post("/check_input", response_model=ValidationResponse)
 def check_input(payload: ValidationRequest) -> ValidationResponse:
     msg = payload.message.strip().lower()
     if msg in {"hey", "hi", "hello", "yo", "sup", "what's up", "whats up"}:
         return ValidationResponse(is_safe=True, filtered_message=payload.message, reason=None)
+
     global input_guard
     if input_guard is None:
         return ValidationResponse(is_safe=False, filtered_message=None, reason="Guards not initialized.")
 
     try:
         outcome = input_guard.validate(payload.message)
+
+        # If ALL validators passed normally
+        if outcome.validation_passed:
+            return ValidationResponse(
+                is_safe=True,
+                filtered_message=outcome.validated_output,
+                reason=None,
+            )
+
+        # If validation failed but was configured as a soft-fail ("noop"),
+        # allow the message through unchanged.
         return ValidationResponse(
-            is_safe=bool(outcome.validation_passed),
-            filtered_message=outcome.validated_output if outcome.validation_passed else None,
+            is_safe=True,
+            filtered_message=payload.message,
             reason=None,
         )
+
     except Exception as e:
+        # Hard fail ("exception") or unexpected error => block
         return ValidationResponse(is_safe=False, filtered_message=None, reason=_extract_reason(e))
 
 
@@ -336,6 +329,34 @@ def check_output(payload: ValidationRequest) -> ValidationResponse:
         )
     except Exception as e:
         return ValidationResponse(is_safe=False, filtered_message=None, reason=_extract_reason(e))
+
+
+@app.get("/thresholds", response_model=ThresholdResponse)
+def get_thresholds() -> ThresholdResponse:
+    return ThresholdResponse(
+        restrict_to_topic=thresholds.restrict_to_topic,
+        toxic_language=thresholds.toxic_language,
+        gibberish_text=thresholds.gibberish_text
+    )
+
+
+@app.post("/thresholds", response_model=ThresholdResponse)
+def update_thresholds(payload: ThresholdUpdateRequest) -> ThresholdResponse:
+    if payload.restrict_to_topic is not None:
+        thresholds.restrict_to_topic = payload.restrict_to_topic
+    if payload.toxic_language is not None:
+        thresholds.toxic_language = payload.toxic_language
+    if payload.gibberish_text is not None:
+        thresholds.gibberish_text = payload.gibberish_text
+
+    # Re-initialize guards with new thresholds
+    startup_event()
+
+    return ThresholdResponse(
+        restrict_to_topic=thresholds.restrict_to_topic,
+        toxic_language=thresholds.toxic_language,
+        gibberish_text=thresholds.gibberish_text
+    )
 
 
 @app.get("/health")

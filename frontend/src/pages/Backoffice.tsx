@@ -32,6 +32,13 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
         answer_ar: ''
     });
 
+    const [thresholds, setThresholds] = useState({
+        restrict_to_topic: 0.25,
+        toxic_language: 0.6,
+        gibberish_text: 0.6
+    });
+    const [savingThresholds, setSavingThresholds] = useState(false);
+
     const navigate = useNavigate();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -45,7 +52,19 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
 
     useEffect(() => {
         fetchProducts();
+        fetchThresholds();
     }, []);
+
+    const fetchThresholds = async () => {
+        try {
+            const res = await axios.get(Endpoints.GUARDRAILS_THRESHOLDS, axiosConfig);
+            if (res.data) {
+                setThresholds(res.data);
+            }
+        } catch (err) {
+            console.error("Failed to fetch thresholds", err);
+        }
+    };
 
     const fetchProducts = async () => {
         try {
@@ -158,6 +177,26 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
         setShowModal(true);
     };
 
+    const handleThresholdChange = (key: keyof typeof thresholds, value: number) => {
+        setThresholds(prev => ({ ...prev, [key]: value }));
+    };
+
+    const handleSaveThresholds = async () => {
+        setSavingThresholds(true);
+        try {
+            const res = await axios.post(Endpoints.GUARDRAILS_THRESHOLDS, thresholds, axiosConfig);
+            if (res.data) {
+                setThresholds(res.data);
+                setMessage("Success: Guardrails thresholds updated!");
+            }
+        } catch (err: any) {
+            setMessage('Error: Failed to save thresholds - ' + (err.response?.data?.detail || err.response?.data?.error || err.message));
+        } finally {
+            setSavingThresholds(false);
+        }
+    };
+
+
     return (
         <div className="backoffice-container">
             <header className="backoffice-header">
@@ -182,6 +221,40 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
                         {loading ? 'Uploading...' : 'Ingest File'}
                     </button>
                 </div>
+            </section>
+
+            <section className="section-card">
+                <h3>Guardrails Strictness Thresholds</h3>
+                <p style={{ marginBottom: '1rem', fontSize: '0.9rem', color: '#555' }}>Adjust the confidence thresholds for the guardrails validation hubs. Lower thresholds are more strict.</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '400px' }}>
+                    <div className="form-group">
+                        <label>Restrict To Topic Threshold: {thresholds.restrict_to_topic}</label>
+                        <input type="range" min="0" max="1" step="0.01"
+                            value={thresholds.restrict_to_topic}
+                            onChange={(e) => handleThresholdChange('restrict_to_topic', parseFloat(e.target.value))}
+                            style={{ width: '100%' }}
+                        />
+                    </div>
+                    <div className="form-group">
+                        <label>Toxic Language Threshold: {thresholds.toxic_language}</label>
+                        <input type="range" min="0" max="1" step="0.01"
+                            value={thresholds.toxic_language}
+                            onChange={(e) => handleThresholdChange('toxic_language', parseFloat(e.target.value))}
+                            style={{ width: '100%' }}
+                        />
+                    </div>
+                    <div className="form-group">
+                        <label>Gibberish Text Threshold: {thresholds.gibberish_text}</label>
+                        <input type="range" min="0" max="1" step="0.01"
+                            value={thresholds.gibberish_text}
+                            onChange={(e) => handleThresholdChange('gibberish_text', parseFloat(e.target.value))}
+                            style={{ width: '100%' }}
+                        />
+                    </div>
+                </div>
+                <button onClick={handleSaveThresholds} disabled={savingThresholds} className="btn btn-primary" style={{ marginTop: '1rem' }}>
+                    {savingThresholds ? 'Saving...' : 'Save Strictness'}
+                </button>
             </section>
 
             <section className="section-card">

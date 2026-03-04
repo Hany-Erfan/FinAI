@@ -169,6 +169,7 @@ services:
       - ./backend:/app/backend
     environment:
       - GUARDRAILS_API_KEY=${GUARDRAILS_API_KEY}
+      - GUARDRAILS_LLM_MODEL=${GUARDRAILS_LLM_MODEL}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - OPENAI_API_KEY=${GOOGLE_API_KEY}
       - GEMINI_API_KEY=${GOOGLE_API_KEY}
