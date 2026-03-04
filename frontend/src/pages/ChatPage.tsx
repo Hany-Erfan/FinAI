@@ -100,7 +100,7 @@ const ChatPage = ({ auth, onLogout, sessionId }) => {
     try {
       const response = await sendChatMessage(input, currentSessionId);
 
-      const agentMessage: Message = { text: response.data.response, sender: 'agent', timestamp: new Date().toISOString() };
+      const agentMessage: Message = { text: response.response, sender: 'agent', timestamp: new Date().toISOString() };
       const finalSessions = updatedSessions.map(s =>
         s.id === currentSessionId ? { ...s, messages: [...s.messages, agentMessage] } : s
       );
