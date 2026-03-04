@@ -22,7 +22,7 @@ from google.adk.events import Event, EventActions
 from google.adk.memory import InMemoryMemoryService
 from google.genai import types
 
-from backend.bank_server.utils.security_deps import auth_cookie_name, csrf_cookie_name, get_current_user, refresh_session_cookies, require_admin, verify_csrf
+from backend.bank_server.utils.security_deps import auth_cookie_name, csrf_cookie_name, get_current_user, refresh_session_cookies, verify_csrf
 from backend.bank_server.utils.user_store import get_user_by_username
 from backend.common.pass_auth import verify_password
 import backend.host_agent.routing_agent as routing_agent_module
@@ -228,6 +228,13 @@ def detect_language(text: str) -> str:
             return "ar"
     return "en"
 
+def build_transcript(messages) -> str:
+    lines = []
+    for m in messages:
+        role_label = m.role.value.upper()
+        lines.append(f"[{role_label}]: {m.content}")
+    return "\n".join(lines)
+
 # =========================
 # API Endpoints
 # =========================
@@ -255,10 +262,11 @@ def login(payload: LoginRequest, response: Response, repo = Depends(get_chat_res
 
     # init session
     repo.create_session(
-            customer_id=user["user_id"],
-            customer_name=payload.username,
+            user_id=user["user_id"],
+            user_name=payload.username,
             session_id=payload.session_id,
         )
+
     return LoginResponse(
         message="Login successful",
         role=user["role"],
@@ -276,6 +284,7 @@ def getCurrentUser(current_user=Depends(get_current_user)) -> User:
         full_name=current_user["full_name"],
 )
 
+
 @app.post("/logout", tags=["Logout"])
 def logout(
     request: Request,
@@ -286,14 +295,32 @@ def logout(
 ) -> dict:
     del current_user, _
     session_id = request.headers.get("X-Session-Id")
-    if not session_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing session id")
-    response.delete_cookie(key=auth_cookie_name(session_id), path="/")
-    response.delete_cookie(key=csrf_cookie_name(session_id), path="/")
 
+    response.delete_cookie(key=auth_cookie_name(session_id), path="/")
+    response.delete_cookie(key=csrf_cookie_name(session_id), path="/")   
     #end session
     repo.end_session(session_id)
     return {"message": "Logged out"}
+
+
+@app.post("/summary",  tags=["Summary"])
+async def record_summary(request: Request, 
+                         current_user=Depends(get_current_user),
+                         repo = Depends(get_chat_respository)):
+    session_id = request.headers.get("X-Session-Id")
+    messages = repo.get_messages(session_id)
+    if not messages:
+        logger.error("Session has no messages to summarise.")
+    else:
+        if not session_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing session id")
+        transcript = build_transcript(messages)
+        safe_transcript = repo.masker.mask(transcript)
+        # 4) just call get_response_from_agent (global runner)
+        await get_response_from_agent(
+        f'summarize the following {session_id}:{safe_transcript}', user_id=current_user["user_id"], session_id=session_id
+        )
+        return {"status": "summary recorded"}
 
 @app.post("/chat", response_model=ChatResponse, tags=["Chat"])
 async def chat_endpoint(
@@ -320,14 +347,13 @@ async def chat_endpoint(
 
         session_id = request.session_id
 
-        # Mask user's message before DB storage 
-        #masked_user_message = repo.masker.mask(request.message)
+        # 2) Mask user's message before DB storage 
+        masked_user_message = repo.masker.mask(request.message)
         repo.save_message(
             session_id=session_id,
             role=MessageRole.USER,
-            content=request.message,
+            content=masked_user_message,
         )
-        print('masked', request.message)
 
         # 3) Create/update ADK session state
         session = await SESSION_SERVICE.get_session(
@@ -390,6 +416,14 @@ async def chat_endpoint(
             )
         )
 
+        # 6) Mask model reply before DB storage
+        masked_reply = repo.masker.mask(response_text)
+
+        repo.save_message(
+            session_id=session_id,
+            role=MessageRole.MODEL,
+            content=masked_reply,
+        )
         return ChatResponse(
             response=final_response or (
                 "لم يتم تلقي أي رد"

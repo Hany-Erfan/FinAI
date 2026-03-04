@@ -19,7 +19,7 @@ Extend PATTERNS or subclass DataMasker to add domain-specific patterns
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 
@@ -35,19 +35,24 @@ class MaskPattern:
 # ---------------------------------------------------------------------------
 DEFAULT_PATTERNS: list[MaskPattern] = [
     MaskPattern(
-        name="CREDIT_CARD",
-        # 4×4 digit groups separated by spaces, dashes, or nothing
-        pattern=r"\b(?:\d[ \-]?){15,16}\b",
+        name="CARD_NUMBER",
+        # for credit/debit cards
+        pattern=r"\b(?:\d[ -]*?){13,19}\b",
     ),
     MaskPattern(
-        name="SSN",
-        # US Social Security Number  123-45-6789
+        name="BANK_ACCOUNT",
+        # Bank account
         pattern=r"\b\d{3}[- ]\d{2}[- ]\d{4}\b",
     ),
     MaskPattern(
+        name="NATIONAL_ID",
+        # National ID for egypt
+        pattern=r"\b[23]\d{13}\b",
+    ),
+    MaskPattern(
+        # Generic IBAN for EU and Egypt
         name="IBAN",
-        # International bank account  DE89 3704 0044 0532 0130 00
-        pattern=r"\b[A-Z]{2}\d{2}[\s]?(?:[A-Z0-9]{4}[\s]?){2,7}\b",
+        pattern=r'\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b',
     ),
     MaskPattern(
         name="EMAIL",
@@ -55,15 +60,8 @@ DEFAULT_PATTERNS: list[MaskPattern] = [
     ),
     MaskPattern(
         name="PHONE",
-        # Covers +1 (555) 123-4567, 555-123-4567, 07911 123456, etc.
-        pattern=(
-            r"(?:\+?[\d\s\-().]{7,20})"
-            r"(?=\s|$|[,;])"
-        ),
-    ),
-    MaskPattern(
-        name="IP_ADDRESS",
-        pattern=r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
+        # Covers local numbers or ones with country codes
+        pattern=r"\b(?:\+?\d{1,3}[-.\s]?)?(?:\(?\d{2,4}\)?[-.\s]?)?\d{3,4}[-.\s]?\d{3,4}\b",
     ),
     MaskPattern(
         name="DATE_OF_BIRTH",

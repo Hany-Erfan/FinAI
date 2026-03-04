@@ -31,14 +31,3 @@ export async function getCurrentUser(sessionId) {
 
   return response.json();
 }
-
-export async function logout(sessionId) {
-  await fetch(`${Endpoints.LOGOUT}`, {
-    method: "POST",
-    headers: {
-      ...sessionHeaders(sessionId),
-      ...csrfHeaders(sessionId),
-    },
-    credentials: "include",
-  });
-}

@@ -4,7 +4,8 @@ import LoginForm from './pages/LoginForm';
 import ProtectedRoute from './pages/ProtectedRoute';
 import ChatPage from './pages/ChatPage';
 import Backoffice from './pages/Backoffice';
-import { getCurrentUser, login, logout } from './api/login';
+import { getCurrentUser, login } from './api/login';
+import { logout, summary } from './api/logout';
 
 const TAB_SESSION_KEY = "chat_tab_session_id";
 const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
@@ -25,16 +26,22 @@ function generateUUID(): string {
 function getOrCreateTabSessionId() {
   let sessionId = sessionStorage.getItem(TAB_SESSION_KEY);
   if (!sessionId) {
-    sessionId = generateUUID();
-    sessionStorage.setItem(TAB_SESSION_KEY, sessionId);
+    sessionId = createNewTabSessionId();
   }
   return sessionId;
 }
 
+function createNewTabSessionId() {
+  const sessionId = crypto.randomUUID();
+  sessionStorage.setItem(TAB_SESSION_KEY, sessionId);
+  return sessionId;
+}
+
+
 export default function App() {
   const [auth, setAuth] = useState(null);
   const [checking, setChecking] = useState(true);
-  const [sessionId] = useState(() => getOrCreateTabSessionId());
+  const [sessionId, setSessionId] = useState(() => getOrCreateTabSessionId());
   const inactivityTimerRef = useRef(null);
 
   useEffect(() => {
@@ -68,11 +75,13 @@ export default function App() {
 
   const handleLogout = useCallback(async () => {
     try {
-      await logout(sessionId);
-    } catch {
-      // Ignore network/logout race errors and force local logout state.
+      await summary(sessionId);
+      logout(sessionId);
+    } catch(err) {
+      console.error('err on logout', err);
     }
     setAuth(null);
+    setSessionId(createNewTabSessionId())
   }, [sessionId]);
 
   useEffect(() => {

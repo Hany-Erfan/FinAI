@@ -12,6 +12,7 @@ export const Endpoints = {
   BACKOFFICE_UPSERT: `${VECTOR_DB_BASE}/upsert`,
   CURRENT_USER: `${API_BASE}/currentUser`,
   LOGOUT: `${API_BASE}/logout`,
+  SUMMARY: `${API_BASE}/summary`,
   GUARDRAILS_CONFIG: `${GUARDRAILS_BASE}/config`
 } as const;
 
