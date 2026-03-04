@@ -4,13 +4,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from .models import Base
-database_url = os.getenv('DATABASE_URL')
-engine = create_engine('postgresql://agentixBuddy:secret@postgres_db:5432/agentixBuddy', pool_pre_ping=True)
+engine = create_engine("postgresql://agentixBuddy:agentixsecret@postgres_db:5432/agentixBuddy", pool_pre_ping=True)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 
 def init_db() -> None:
-    """Create all tables (use Alembic in production for migrations)."""
+    """Create all tables (use Alembic in production for migrations). -> later for versioning """ 
     Base.metadata.create_all(bind=engine)
 
 

@@ -2,10 +2,9 @@
 SQLAlchemy ORM models.
 
 Tables:
-  sessions   – one row per customer conversation session
+  sessions   – one row per session
   messages   – one row per turn (user or model)
   summaries  – one row per session, generated on-demand or at session end
-  exports    – one row per export event (multiple allowed per session)
 """
 import uuid
 from datetime import datetime
@@ -41,12 +40,12 @@ class ResolutionStatus(str, enum.Enum): # currently not used
 
 
 class Session(Base):
-    """One row per customer service conversation."""
+    """One row per session."""
     __tablename__ = "sessions"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    customer_id = Column(String(255), nullable=True, index=True)    
-    customer_name = Column(String(255), nullable=True)              
+    user_id = Column(String(255), nullable=True, index=True)    
+    user_name = Column(String(255), nullable=True)              
     status = Column(Enum(SessionStatus), default=SessionStatus.ACTIVE, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     ended_at = Column(DateTime(timezone=True), nullable=True)
@@ -56,8 +55,6 @@ class Session(Base):
                             cascade="all, delete-orphan", order_by="Message.created_at")
     summary = relationship("Summary", back_populates="session",
                            uselist=False, cascade="all, delete-orphan")
-    exports = relationship("Export", back_populates="session",
-                           cascade="all, delete-orphan", order_by="Export.exported_at")
 
 
 class Message(Base):
@@ -95,24 +92,3 @@ class Summary(Base):
     raw_response = Column(JSONB, default=dict)                      # full structured output
 
     session = relationship("Session", back_populates="summary")
-
-
-class Export(Base):
-    """
-    One row per export event — a self-contained snapshot of the session,
-    its masked transcript, and the AI summary at the moment of export.
-    Multiple exports can exist per session.
-    """
-    __tablename__ = "exports"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    session_id = Column(UUID(as_uuid=True), ForeignKey("sessions.id", ondelete="CASCADE"),
-                        nullable=False, index=True)
-    exported_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    triggered_by = Column(String(64), nullable=False, default="manual")
-                                                                    # manual | end_session | timeout
-    session_info = Column(JSONB, nullable=False, default=dict)      # session field snapshot
-    messages = Column(JSONB, nullable=False, default=list)          # [{role, content, created_at}]
-    summary_info = Column(JSONB, nullable=False, default=dict)      # summary field snapshot
-
-    session = relationship("Session", back_populates="exports")
