@@ -16,5 +16,5 @@ ENV PYTHONPATH=/app
 # Expose port
 EXPOSE 8003
 
-# Run the summary agent server
+# Run the purchase agent server
 CMD ["python", "-m", "backend.agents.summary_agent.server"]

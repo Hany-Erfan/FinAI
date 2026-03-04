@@ -20,6 +20,7 @@ fastembed==0.7.4
 google-genai==1.55.0
 langfuse==3.9.2
 openinference-instrumentation-google-adk==0.1.6
+
 sqlalchemy>=2.0.0
 psycopg2-binary>=2.9.9
 alembic>=1.13.0

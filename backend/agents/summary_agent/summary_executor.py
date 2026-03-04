@@ -19,13 +19,12 @@ from google.genai import types
 
 from backend.agents.summary_agent.summary_agent import SummaryAgent
 
-
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
 class SummaryExecutor(AgentExecutor):
-    """An AgentExecutor that runs an ADK-based Agent for Summarization."""
+    """An AgentExecutor that runs an ADK-based Agent for summary."""
 
     def __init__(self, card: AgentCard):
         self._card = card
@@ -69,13 +68,13 @@ class SummaryExecutor(AgentExecutor):
         user_id: str = None,
     ) -> None:
         """Process request using cached SummaryAgent instance."""
-        # Get cached Summary agent for this user
-        summary_agent = SummaryAgent.get_agent(user_id=user_id)
+        # Get cached summary agent for this user
+        summary_agent = SummaryAgent.get_agent(user_id=user_id, session_id=session_id)
         
         session_state = self._prepare_session_state(
             jwt_token, user_id
         )
-        
+        logging.info(f'session_id {session_id}')
         # Create or get session
         session_obj = await summary_agent._get_or_create_session(
             user_id=user_id,
@@ -86,9 +85,6 @@ class SummaryExecutor(AgentExecutor):
 
         # Track this session as active
         self._active_sessions.add(session_id)
-
-        # generate summary
-        self.generate_and_store(session_id)
 
         try:
             async for event in summary_agent.runner.run_async(
@@ -138,11 +134,12 @@ class SummaryExecutor(AgentExecutor):
         # Extract JWT token and user credentials from message metadata
         jwt_token = None
         user_id = 'self'
-        
         if hasattr(context.message, 'metadata') and context.message.metadata:
             jwt_token = context.message.metadata.get("jwt_token")
             user_id = context.message.metadata.get("user_id", 'self')
+            session_id = context.message.metadata.get("session_id", 'self')
             logger.debug(f'[Summary] Extracted metadata - user_id: {user_id}')
+            logger.debug(f'[Summary] Extracted metadata - user_id: {session_id}')
         else:
             logger.debug('[Summary] No metadata found in message')
         
@@ -175,13 +172,13 @@ class SummaryExecutor(AgentExecutor):
         session_id = context.context_id
         if session_id in self._active_sessions:
             logger.info(
-                f'Cancellation requested for active Summary session: {session_id}'
+                f'Cancellation requested for active weather session: {session_id}'
             )
             # TODO: Implement proper cancellation when ADK supports it
             self._active_sessions.discard(session_id)
         else:
             logger.debug(
-                f'Cancellation requested for inactive Summary session: {session_id}'
+                f'Cancellation requested for inactive weather session: {session_id}'
             )
 
         raise ServerError(error=UnsupportedOperationError())
@@ -250,5 +247,3 @@ def convert_genai_part_to_a2a(part: types.Part) -> Part:
             )
         )
     raise ValueError(f'Unsupported part type: {part}')
-
-

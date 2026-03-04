@@ -1,8 +1,9 @@
 """
-Summary A2A Agent Server
-Uses the SummaryExecutor and Summary Agent components
+Retail A2A Agent Server
+Uses the RetailExecutor and Retail Agent components
 """
 import os
+from backend.agents.summary_agent.summary_executor import SummaryExecutor
 import uvicorn
 from a2a.server.apps import A2AStarletteApplication
 from a2a.server.request_handlers import DefaultRequestHandler
@@ -14,9 +15,7 @@ from a2a.types import (
 )
 from starlette.routing import Route
 from starlette.middleware.cors import CORSMiddleware
-
 from backend.agents.summary_agent.routes.summary_health import get_summary_health
-from backend.agents.summary_agent.summary_executor import SummaryExecutor
 
 # Set Google API key explicitly
 os.environ["GOOGLE_API_KEY"] = os.getenv('GOOGLE_API_KEY', "***REMOVED***")
@@ -34,23 +33,27 @@ def build_summary_app():
     skill = AgentSkill(
             id="summary_agent",
             name="Summary Agent",
-            description='A dedicated Summary assistant that summarizes the transcripts at the end of the conversations or on export',
-            tags=["summary", "export"],
-            )
-
+            description='A dedicated Summary assistant that summarizes the transcripts at the end of the conversation using `record_summary_tool` ',
+            examples=[
+                "Can you summarize the following",
+                "I'd like to have a summary for the conversation",
+            ],
+            tags=["summary"],
+        )
+        
     # Create agent card
     agent_card = AgentCard(
         name='Summary Agent',
-        description='A dedicated Summary assistant that summarizes the transcripts at the end of the conversations or on export',
-        url=os.environ.get('SUMMARY_AGENT', 'http://localhost:8003'),
+            description='A dedicated Summary assistant that summarizes the transcripts at the end of the conversation using `record_summary_tool` ',
+        url=os.environ.get('SUMMARY_AGENT_URL', 'http://localhost:8003'),
         version='1.0.0',
         default_input_modes=['text'],
         default_output_modes=['text'],
         capabilities=AgentCapabilities(streaming=True),
         skills=[skill],
     )
-             
-    # Create executor
+
+    # Create executor using your existing SummaryExecutor
     agent_executor = SummaryExecutor(agent_card)
     
     # Create request handler
@@ -82,10 +85,10 @@ summary_app = build_summary_app()
 
 
 def main():
-    """Main function to start the Summary agent server"""
+    """Main function to start the summary agent server"""
     print("[SERVER] Starting server...")
     uvicorn.run(
-        "backend.agents.faq_agent.server:summary_app",
+        "backend.agents.summary_agent.server:summary_app",
         host="0.0.0.0",
         port=8003,
         reload=True,
