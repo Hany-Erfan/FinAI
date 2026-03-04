@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vector-db-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vector-db-service
+  template:
+    metadata:
+      labels:
+        app: vector-db-service
+    spec:
+      nodeSelector:
+        cloud.google.com/gke-spot: "true"
+      containers:
+        - name: vector-db-service
+          image: IMAGE_PLACEHOLDER
+          ports:
+            - containerPort: 8004
+          envFrom:
+            - configMapRef:
+                name: app-env
+            - secretRef:
+                name: api-keys
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: QDRANT_URL
+              value: http://qdrant:6333
+            - name: QDRANT_API_KEY
+              value: ""
+            - name: VECTOR_DB_COLLECTION
+              value: sample_bank_products
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 200m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vector-db-service
+spec:
+  type: ClusterIP
+  selector:
+    app: vector-db-service
+  ports:
+    - port: 8004
+      targetPort: 8004
+      protocol: TCP

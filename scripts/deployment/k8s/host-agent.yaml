@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: host-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: host-agent
+  template:
+    metadata:
+      labels:
+        app: host-agent
+    spec:
+      nodeSelector:
+        cloud.google.com/gke-spot: "true"
+      containers:
+        - name: host-agent
+          image: IMAGE_PLACEHOLDER
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: app-env
+            - secretRef:
+                name: api-keys
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: FAQ_AGENT_URL
+              value: http://faq-agent:8001
+            - name: GUARDRAILS_URL
+              value: http://guardrails-service:8005
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 200m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: host-agent
+spec:
+  type: ClusterIP
+  selector:
+    app: host-agent
+  ports:
+    - port: 8000
+      targetPort: 8000
+      protocol: TCP

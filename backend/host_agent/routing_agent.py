@@ -633,7 +633,6 @@ async def init_routing_agent() -> None:
 
     routing_agent_instance = await RoutingAgent.create(
         remote_agent_addresses=[
-            os.getenv("RETAIL_AGENT_URL", "http://retail-agent:8002"),
             os.getenv("FAQ_AGENT_URL", "http://faq-agent:8001"),
         ]
     )

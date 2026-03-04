@@ -9,10 +9,23 @@ import { getCurrentUser, login, logout } from './api/login';
 const TAB_SESSION_KEY = "chat_tab_session_id";
 const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
 
+// Fallback for crypto.randomUUID (not available on HTTP non-localhost)
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback implementation
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 function getOrCreateTabSessionId() {
   let sessionId = sessionStorage.getItem(TAB_SESSION_KEY);
   if (!sessionId) {
-    sessionId = crypto.randomUUID();
+    sessionId = generateUUID();
     sessionStorage.setItem(TAB_SESSION_KEY, sessionId);
   }
   return sessionId;

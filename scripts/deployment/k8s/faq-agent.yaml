@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: faq-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: faq-agent
+  template:
+    metadata:
+      labels:
+        app: faq-agent
+    spec:
+      nodeSelector:
+        cloud.google.com/gke-spot: "true"
+      containers:
+        - name: faq-agent
+          image: IMAGE_PLACEHOLDER
+          ports:
+            - containerPort: 8001
+          envFrom:
+            - configMapRef:
+                name: app-env
+            - secretRef:
+                name: api-keys
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: VECTOR_DB_SERVICE_URL
+              value: http://vector-db-service:8004
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 200m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: faq-agent
+spec:
+  type: ClusterIP
+  selector:
+    app: faq-agent
+  ports:
+    - port: 8001
+      targetPort: 8001
+      protocol: TCP
