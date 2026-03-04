@@ -1,6 +1,12 @@
 """
 Guardrails Service
-Analyzes inputs and outputs for the routing agent using Guardrails Hub validators (NO custom LLM calls).
+Analyzes inputs and outputs for the routing agent using Guardrails Hub validators.
+
+Optional LLM fallback (global):
+- Set env var GUARDRAILS_LLM_MODEL to enable LLM fallback for RestrictToTopic.
+  Examples:
+    GUARDRAILS_LLM_MODEL="gemini-1.5-flash"
+    GUARDRAILS_LLM_MODEL="gemini-1.5-pro"
 
 Required hub installs (examples):
   guardrails hub install hub://guardrails/detect_pii
@@ -13,7 +19,7 @@ Required hub installs (examples):
 from __future__ import annotations
 
 import os
-from typing import Optional
+from typing import Optional, Callable, Tuple
 
 import uvicorn
 from fastapi import FastAPI
@@ -38,7 +44,7 @@ from guardrails.hub import (
 app = FastAPI(
     title="Guardrails Service",
     description="Validation service for routing agent inputs and outputs using Guardrails Hub validators.",
-    version="1.2.0",
+    version="1.4.0",
 )
 
 
@@ -53,7 +59,7 @@ class ValidationResponse(BaseModel):
 
 
 # ---------------------------------------------------------
-# Custom Validators (rule-based, no LLMs)
+# Custom Validators (rule-based)
 # ---------------------------------------------------------
 
 @register_validator(name="is-safe-input", data_type="string")
@@ -112,13 +118,29 @@ class IsSafeOutput(Validator):
 
 
 # ---------------------------------------------------------
-# Hub Validator Configuration (less strict / more coverage)
+# Hub Validator Configuration
 # ---------------------------------------------------------
 
 PII_ENTITIES = ["EMAIL_ADDRESS", "PHONE_NUMBER", "CREDIT_CARD", "IBAN_CODE", "US_SSN"]
 
-# Broader, more realistic banking topics/phrases so RestrictToTopic matches better
+# Broader, more realistic banking topics/phrases + greetings/small talk so basic chat isn't blocked
 VALID_TOPICS = [
+    # greetings / small talk
+    "greeting",
+    "hello",
+    "hi",
+    "hey",
+    "good morning",
+    "good afternoon",
+    "good evening",
+    "how are you",
+    "what's up",
+    "whats up",
+    "thanks",
+    "thank you",
+    "bye",
+    "goodbye",
+
     # broad umbrella terms
     "banking",
     "retail banking",
@@ -130,6 +152,7 @@ VALID_TOPICS = [
 
     # auth/login
     "login",
+    "log in",
     "sign in",
     "password",
     "password reset",
@@ -139,7 +162,9 @@ VALID_TOPICS = [
 
     # general info
     "bank hours",
+    "opening hours",
     "branch location",
+    "branch",
     "atm",
     "routing number",
     "swift",
@@ -176,6 +201,37 @@ VALID_TOPICS = [
     "mortgage",
 ]
 
+
+def _build_global_gemini_llm_callable() -> Tuple[Optional[str], Optional[Callable[[str], str]]]:
+    """
+    Builds a Gemini LLM callable if GUARDRAILS_LLM_MODEL is set.
+    Returns (model_name, callable) or (None, None).
+
+    Requires:
+      - google-generativeai installed
+      - GOOGLE_API_KEY set
+    """
+    model = (os.getenv("GUARDRAILS_LLM_MODEL") or "").strip()
+    if not model:
+        return None, None
+
+    api_key = (os.getenv("GOOGLE_API_KEY") or "").strip()
+    if not api_key:
+        raise RuntimeError("GUARDRAILS_LLM_MODEL is set but GOOGLE_API_KEY is missing.")
+
+    import google.generativeai as genai  # type: ignore
+
+    genai.configure(api_key=api_key)
+    gemini_model = genai.GenerativeModel(model)
+
+    def llm_callable(prompt: str) -> str:
+        resp = gemini_model.generate_content(prompt)
+        # Be defensive: sometimes SDK returns None text
+        return getattr(resp, "text", None) or ""
+
+    return model, llm_callable
+
+
 input_guard: Optional[Guard] = None
 output_guard: Optional[Guard] = None
 
@@ -184,17 +240,18 @@ output_guard: Optional[Guard] = None
 def startup_event() -> None:
     """
     Initialize guards once at startup.
-    Uses ONLY Hub validators + simple rule-based custom validators.
-    No LLM-based validator is used.
+    Uses Hub validators + rule-based validators.
+    Includes optional Gemini LLM fallback for RestrictToTopic if GUARDRAILS_LLM_MODEL is set.
     """
     global input_guard, output_guard
 
-    # INPUT:
-    # - Keep rule-based checks
-    # - Make RestrictToTopic more forgiving (lower threshold + broader topics)
-    # - Keep PII detection
-    # - Keep Toxic/Gibberish
-    # - Make SecretsPresent non-blocking for INPUT (it is noisy for natural language)
+    llm_model, llm_callable = _build_global_gemini_llm_callable()
+    use_llm = llm_callable is not None
+
+    # INPUT
+    # Uses BOTH fixes:
+    #  1) expanded VALID_TOPICS including greetings/small talk
+    #  2) RestrictToTopic is soft (on_fail="noop") so casual chat isn't blocked
     input_guard = (
         Guard()
         .use(
@@ -207,9 +264,10 @@ def startup_event() -> None:
                 valid_topics=VALID_TOPICS,
                 invalid_topics=[],
                 disable_classifier=False,
-                disable_llm=True,        # no LLM fallback
-                model_threshold=0.35,    # less strict than 0.5
-                on_fail="exception",
+                disable_llm=not use_llm,
+                llm_callable=llm_callable if use_llm else None,
+                model_threshold=0.25,   # more permissive
+                on_fail="noop",         # soft fail: don't block greetings/small talk
             ),
 
             DetectPII(pii_entities=PII_ENTITIES, on_fail="exception"),
@@ -222,8 +280,7 @@ def startup_event() -> None:
         )
     )
 
-    # OUTPUT:
-    # Keep strict (PII + secrets + toxicity/gibberish), because output is what you return to users.
+    # OUTPUT (keep strict)
     output_guard = (
         Guard()
         .use(
@@ -235,15 +292,15 @@ def startup_event() -> None:
         )
     )
 
+    if llm_model:
+        print(f"[GUARDRAILS] RestrictToTopic LLM fallback enabled via GUARDRAILS_LLM_MODEL={llm_model!r}")
+    else:
+        print("[GUARDRAILS] RestrictToTopic LLM fallback disabled (GUARDRAILS_LLM_MODEL not set)")
+
 
 def _extract_reason(exc: Exception) -> str:
-    """
-    Guardrails exceptions can be verbose; return a readable reason string.
-    """
     msg = str(exc).strip()
-    if not msg:
-        return "Validation failed."
-    return msg
+    return msg or "Validation failed."
 
 
 @app.post("/check_input", response_model=ValidationResponse)
@@ -286,7 +343,6 @@ async def health():
 
 
 def main():
-    """Main entrypoint for Guardrails service server"""
     print("[SERVER] Starting Guardrails Service...")
     port = int(os.getenv("PORT", "8005"))
 
