@@ -8,8 +8,7 @@ dependencies = [
     "uvicorn==0.38.0",
     "pydantic==2.12.5",
     "requests==2.32.5",
-    # Guardrail dependency for later integration:
-    "guardrails-ai==0.5.15"
+    "guardrails-ai>=0.9.1"
 ]
 
 [build-system]

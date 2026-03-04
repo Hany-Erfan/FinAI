@@ -27,7 +27,10 @@ services:
     volumes:
       - ./backend:/app/backend
     depends_on:
-      - retail-agent
+      retail-agent:
+        condition: service_started
+      guardrails-service:
+        condition: service_healthy
     environment:
       - PYTHONUNBUFFERED=1
       - UVICORN_LOG_LEVEL=debug
@@ -157,14 +160,29 @@ services:
     build:
       context: .
       dockerfile: backend/services/guardrails/Dockerfile
+      args:
+        - GUARDRAILS_API_KEY=${GUARDRAILS_API_KEY}
     container_name: guardrails-service
     ports:
       - "8005:8005"
     volumes:
       - ./backend:/app/backend
     environment:
+      - GUARDRAILS_API_KEY=${GUARDRAILS_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - OPENAI_API_KEY=${GOOGLE_API_KEY}
+      - GEMINI_API_KEY=${GOOGLE_API_KEY}
       - PYTHONUNBUFFERED=1
       - PORT=8005
+      - TOKENIZERS_PARALLELISM=false
+      - OMP_NUM_THREADS=1
+      - MKL_NUM_THREADS=1
+      - NLTK_DATA=/usr/local/nltk_data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8005/health"]
+      interval: 5s
+      timeout: 2s
+      retries: 60
     command: >
       python -m backend.services.guardrails.server
 

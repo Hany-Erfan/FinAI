@@ -98,9 +98,18 @@ const ChatPage = ({ auth, onLogout, sessionId }) => {
     setIsLoading(true);
 
     try {
-      const response = await sendChatMessage(input, currentSessionId);
+      const result = await sendChatMessage(input, currentSessionId);
 
-      const agentMessage: Message = { text: response.data.response, sender: 'agent', timestamp: new Date().toISOString() };
+      // Support both possible return shapes:
+      // 1) axios response: { data: { response: string } }
+      // 2) direct JSON: { response: string }
+      const reply = result?.data?.response ?? result?.response;
+
+      if (!reply) {
+        throw new Error('Unexpected chat response shape');
+      }
+
+      const agentMessage: Message = { text: reply, sender: 'agent', timestamp: new Date().toISOString() };
       const finalSessions = updatedSessions.map(s =>
         s.id === currentSessionId ? { ...s, messages: [...s.messages, agentMessage] } : s
       );
