@@ -5,6 +5,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 K8S_DIR="$SCRIPT_DIR/k8s"
 
 # ----------------------------
+# --- Install jq if not present ---
+# ----------------------------
+if ! command -v jq &> /dev/null; then
+  echo "jq not found. Installing jq..."
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    brew install jq
+  elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    sudo apt-get update && sudo apt-get install -y jq
+  fi
+fi
+
+# ----------------------------
 # --- Load .env file first ---
 # ----------------------------
 if [ -f .env ]; then
@@ -14,6 +26,15 @@ if [ -f .env ]; then
   set +a
 else
   echo "No .env file found, using defaults"
+fi
+
+if [ -f .env.secrets ]; then
+  echo "Loading secrets from .env.secrets file..."
+  set -a
+  source .env.secrets
+  set +a
+else
+  echo "WARNING: No .env.secrets file found. API keys will not be set."
 fi
 
 # ----------------------------
@@ -52,7 +73,7 @@ gcloud container clusters get-credentials $CLUSTER_NAME --region $REGION
 # --- Reserve/Get Static IP for Ingress LoadBalancer ---
 # ----------------------------
 STATIC_IP_NAME="agentixbuddy-ingress-ip"
-if ! gcloud compute addresses describe "$STATIC_IP_NAME" --region "$REGION" >/dev/null 2>&1; then
+if [ -z "$(gcloud compute addresses describe "$STATIC_IP_NAME" --region "$REGION" --format=json 2>/dev/null | jq -r '.address // empty')" ]; then
   echo "Static IP not found. Creating static IP: $STATIC_IP_NAME ..."
   gcloud compute addresses create "$STATIC_IP_NAME" --region "$REGION"
 else
@@ -77,6 +98,15 @@ fi
 kubectl get namespace $NAMESPACE >/dev/null 2>&1 || kubectl create namespace $NAMESPACE
 
 # ----------------------------
+# --- Create Secret for API Keys ---
+# ----------------------------
+echo "Creating Kubernetes secret for API keys..."
+kubectl create secret generic api-keys \
+  --from-env-file=.env.secrets \
+  -n $NAMESPACE \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# ----------------------------
 # --- Create ConfigMap from .env ---
 # ----------------------------
 kubectl create configmap app-env \
@@ -87,23 +117,33 @@ kubectl create configmap app-env \
 # ----------------------------
 # --- CLEANUP EXISTING RESOURCES ---
 # ----------------------------
-echo "Cleaning up all deployments, statefulsets, jobs, pods, services, PVCs in $NAMESPACE..."
-kubectl delete deployment --all -n $NAMESPACE --ignore-not-found
-kubectl delete statefulset --all -n $NAMESPACE --ignore-not-found
-kubectl delete job --all -n $NAMESPACE --ignore-not-found
-kubectl delete pod --all -n $NAMESPACE --ignore-not-found
-kubectl delete service --all -n $NAMESPACE --ignore-not-found
-kubectl delete pvc --all -n $NAMESPACE --ignore-not-found
+if [ "${SKIP_DB}" = "1" ]; then
+  echo "Cleaning up app deployments only (keeping database)..."
+  kubectl delete deployment --all -n $NAMESPACE --ignore-not-found
+  kubectl delete job --all -n $NAMESPACE --ignore-not-found
+else
+  echo "Cleaning up all deployments, statefulsets, jobs, pods, services, PVCs in $NAMESPACE..."
+  kubectl delete deployment --all -n $NAMESPACE --ignore-not-found
+  kubectl delete statefulset --all -n $NAMESPACE --ignore-not-found
+  kubectl delete job --all -n $NAMESPACE --ignore-not-found
+  kubectl delete pod --all -n $NAMESPACE --ignore-not-found
+  kubectl delete service --all -n $NAMESPACE --ignore-not-found
+  kubectl delete pvc --all -n $NAMESPACE --ignore-not-found
+fi
 
 # ----------------------------
 # --- Deploy Qdrant (Vector Database) ---
 # ----------------------------
-echo "Deploying Qdrant..."
-kubectl apply -n $NAMESPACE -f "$K8S_DIR/qdrant.yaml"
+if [ "${SKIP_DB}" != "1" ]; then
+  echo "Deploying Qdrant..."
+  kubectl apply -n $NAMESPACE -f "$K8S_DIR/qdrant.yaml"
 
-# Wait for Qdrant to be ready
-echo "Waiting for Qdrant to be ready..."
-kubectl rollout status statefulset/qdrant -n $NAMESPACE --timeout=300s
+  # Wait for Qdrant to be ready
+  echo "Waiting for Qdrant to be ready..."
+  kubectl rollout status statefulset/qdrant -n $NAMESPACE --timeout=300s
+else
+  echo "Skipping database deployment (SKIP_DB=1)"
+fi
 
 # ----------------------------
 # --- Build and Deploy Services ---

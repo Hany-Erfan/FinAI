@@ -22,6 +22,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: app-env
+            - secretRef:
+                name: api-keys
           env:
             - name: PYTHONUNBUFFERED
               value: "1"

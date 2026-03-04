@@ -1,4 +1,4 @@
-.PHONY: help up down restart logs status build rebuild deploy-cluster deploy-status deploy-logs deploy-cost-estimate teardown-cluster deploy-frontend deploy-host-agent deploy-faq-agent deploy-vector-db deploy-guardrails
+.PHONY: help up down restart logs status build rebuild deploy-cluster deploy-services deploy-apps deploy-status deploy-logs deploy-cost-estimate teardown-cluster deploy-frontend deploy-host-agent deploy-faq-agent deploy-vector-db deploy-guardrails
 
 # Load environment variables (POSIX-safe)
 ifneq (,$(wildcard .env))
@@ -55,8 +55,11 @@ rebuild: ## Rebuild all containers without cache
 # Cloud Deployment (GKE)
 # ============================================
 
-deploy-cluster: ## Deploy GKE cluster and application (requires gcloud auth)
+deploy-cluster: ## Deploy full GKE cluster, database, and all services (requires gcloud auth)
 	./scripts/deployment/deploy_gke.sh
+
+deploy-services: ## Redeploy secrets, config, and all services (keeps database and data)
+	SKIP_DB=1 ./scripts/deployment/deploy_gke.sh
 
 teardown-cluster: ## Teardown GKE cluster and release resources (requires gcloud auth)
 	./scripts/deployment/teardown_gke.sh
@@ -98,6 +101,8 @@ deploy-cost-estimate: ## Show estimated GKE costs and resource breakdown
 	@echo ""
 	@echo "Estimated Monthly Cost: Visit https://cloud.google.com/products/calculator"
 	@echo "Autopilot charges: ~\$$0.0445/vCPU-hour, ~\$$0.00491/GB-hour"
+
+deploy-apps: deploy-frontend deploy-host-agent deploy-faq-agent deploy-vector-db deploy-guardrails ## Rebuild and deploy all app services (keeps databases)
 
 # ============================================
 # Individual Service Deployments (for updates)
