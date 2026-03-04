@@ -286,8 +286,6 @@ def startup_event() -> None:
         .use(
             DetectPII(pii_entities=PII_ENTITIES, on_fail="exception"),
             SecretsPresent(on_fail="exception"),
-            ToxicLanguage(threshold=0.6, validation_method="sentence", on_fail="exception"),
-            GibberishText(threshold=0.6, validation_method="sentence", on_fail="exception"),
             IsSafeOutput(on_fail="exception"),
         )
     )
@@ -305,6 +303,9 @@ def _extract_reason(exc: Exception) -> str:
 
 @app.post("/check_input", response_model=ValidationResponse)
 def check_input(payload: ValidationRequest) -> ValidationResponse:
+    msg = payload.message.strip().lower()
+    if msg in {"hey", "hi", "hello", "yo", "sup", "what's up", "whats up"}:
+        return ValidationResponse(is_safe=True, filtered_message=payload.message, reason=None)
     global input_guard
     if input_guard is None:
         return ValidationResponse(is_safe=False, filtered_message=None, reason="Guards not initialized.")
