@@ -110,7 +110,8 @@ class User(BaseModel):
 async def check_guardrails_input(message: str) -> bool:
     """Check user input against Guardrails service."""
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        timeout = httpx.Timeout(30.0, connect=5.0)  # allow LLM-based validators time to finish
+        async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(
                 f"{GUARDRAILS_URL}/check_input",
                 json={"message": message},
@@ -120,9 +121,14 @@ async def check_guardrails_input(message: str) -> bool:
                 if not data.get("is_safe", True):
                     logger.warning(f"[GUARDRAILS] Input blocked: {data.get('reason')}")
                     return False
+                return True
+
+            logger.error(f"[ERROR] Guardrails input check non-200: {response.status_code} body={response.text!r}")
+            return False  # fail closed
+
     except Exception as e:
-        logger.error(f"[ERROR] Guardrails input check failed: {e}")
-    return True
+        logger.error(f"[ERROR] Guardrails input check failed: {type(e).__name__}: {e!r}")
+        return False  # fail closed
 
 
 async def check_guardrails_output(message: str) -> tuple[bool, str | None]:

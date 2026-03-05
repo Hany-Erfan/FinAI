@@ -227,10 +227,25 @@ def _build_global_gemini_llm_callable() -> Tuple[Optional[str], Optional[Callabl
     genai.configure(api_key=api_key)
     gemini_model = genai.GenerativeModel(model)
 
-    def llm_callable(prompt: str) -> str:
-        resp = gemini_model.generate_content(prompt)
-        # Be defensive: sometimes SDK returns None text
-        return getattr(resp, "text", None) or ""
+    def llm_callable(prompt: str = "", messages=None, **kwargs) -> str:
+        # Guardrails may call llm_callable with either a raw prompt OR chat-style messages.
+        # Support both to avoid silent failures / signature mismatches.
+        if messages:
+            prompt = "\n".join(
+                m.get("content", "") if isinstance(m, dict) else str(m)
+                for m in messages
+            )
+
+        print(f"[GUARDRAILS][LLM] Calling Gemini model={model!r} prompt_len={len(prompt)}")
+        try:
+            resp = gemini_model.generate_content(prompt)
+            # Be defensive: sometimes SDK returns None text
+            text = (getattr(resp, "text", None) or "").strip()
+            print(f"[GUARDRAILS][LLM] Gemini response_len={len(text)}")
+            return text
+        except Exception as e:
+            print(f"[GUARDRAILS][LLM][ERROR] Gemini call failed: {type(e).__name__}: {e}")
+            raise
 
     return model, llm_callable
 
@@ -291,6 +306,14 @@ def startup_event() -> None:
     input_guard = Guard().use(*input_validators) if input_validators else Guard()
     output_guard = Guard().use(*output_validators) if output_validators else Guard()
 
+    print("[GUARDRAILS] Input validators order:")
+    for v in input_validators:
+        print(f"  - {v.__class__.__name__}")
+
+    print("[GUARDRAILS] Output validators order:")
+    for v in output_validators:
+        print(f"  - {v.__class__.__name__}")
+
     if llm_model:
         print(f"[GUARDRAILS] RestrictToTopic LLM fallback enabled via GUARDRAILS_LLM_MODEL={llm_model!r}")
     else:
@@ -312,7 +335,9 @@ def check_input(payload: ValidationRequest) -> ValidationResponse:
         return ValidationResponse(is_safe=False, filtered_message=None, reason="Guards not initialized.")
 
     try:
+        print(f"[GUARDRAILS][INPUT] validate start msg_len={len(payload.message)}")
         outcome = input_guard.validate(payload.message)
+        print(f"[GUARDRAILS][INPUT] validate end passed={bool(outcome.validation_passed)}")
 
         # If ALL validators passed normally
         if outcome.validation_passed:
@@ -332,6 +357,7 @@ def check_input(payload: ValidationRequest) -> ValidationResponse:
 
     except Exception as e:
         # Hard fail ("exception") or unexpected error => block
+        print(f"[GUARDRAILS][INPUT][ERROR] validate failed: {type(e).__name__}: {e}")
         return ValidationResponse(is_safe=False, filtered_message=None, reason=_extract_reason(e))
 
 
@@ -342,13 +368,16 @@ def check_output(payload: ValidationRequest) -> ValidationResponse:
         return ValidationResponse(is_safe=False, filtered_message=None, reason="Guards not initialized.")
 
     try:
+        print(f"[GUARDRAILS][OUTPUT] validate start msg_len={len(payload.message)}")
         outcome = output_guard.validate(payload.message)
+        print(f"[GUARDRAILS][OUTPUT] validate end passed={bool(outcome.validation_passed)}")
         return ValidationResponse(
             is_safe=bool(outcome.validation_passed),
             filtered_message=outcome.validated_output if outcome.validation_passed else None,
             reason=None,
         )
     except Exception as e:
+        print(f"[GUARDRAILS][OUTPUT][ERROR] validate failed: {type(e).__name__}: {e}")
         return ValidationResponse(is_safe=False, filtered_message=None, reason=_extract_reason(e))
 
 
