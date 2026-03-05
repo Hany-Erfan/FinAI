@@ -4,6 +4,9 @@
     margin: 0 auto;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     color: #333;
+    min-height: 100vh;
+    overflow-y: scroll;
+    /* Prevent horizontal jump when topics/content change */
 }
 
 .backoffice-header {
@@ -95,7 +98,7 @@
     border: 1px solid #e1e4e8;
     border-radius: 8px;
     background-color: #fff;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .section-card h3 {
@@ -179,7 +182,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(0,0,0,0.6);
+    background-color: rgba(0, 0, 0, 0.6);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -192,10 +195,10 @@
     padding: 2rem;
     border-radius: 12px;
     width: 100%;
-    maxWidth: 650px;
+    max-width: 650px;
     max-height: 90vh;
     overflow-y: auto;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
 }
 
 .modal-content h2 {
@@ -227,14 +230,14 @@
 .form-control:focus {
     outline: none;
     border-color: #007bff;
-    box-shadow: 0 0 0 2px rgba(0,123,255,0.1);
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
 }
 
 .modal-footer {
     display: flex;
     justify-content: flex-end;
     gap: 1rem;
-    marginTop: 2rem;
+    margin-top: 2rem;
     padding-top: 1rem;
     border-top: 1px solid #eee;
 }

@@ -281,7 +281,6 @@ def admin_panel(current_user=Depends(require_admin)) -> dict:
 }
 
 
-
 @app.post("/chat", response_model=ChatResponse, tags=["Chat"])
 async def chat_endpoint(
     request: ChatRequest,
@@ -289,11 +288,26 @@ async def chat_endpoint(
     _: None = Depends(verify_csrf),
 ):
     try:
+        def _detect_language(text: str) -> str:
+            # Lightweight script-based detection (Arabic vs default English)
+            # Arabic Unicode blocks: \u0600-\u06FF, \u0750-\u077F, \u08A0-\u08FF
+            for ch in text:
+                o = ord(ch)
+                if (0x0600 <= o <= 0x06FF) or (0x0750 <= o <= 0x077F) or (0x08A0 <= o <= 0x08FF):
+                    return "ar"
+            return "en"
+
+        lang = _detect_language(request.message or "")
+
         # 1) Guardrails input
         is_safe_input = await check_guardrails_input(request.message)
         if not is_safe_input:
             return ChatResponse(
-                response="I'm sorry, I cannot process your request due to policy restrictions.",
+                response=(
+                    "عذرًا، لا يمكنني معالجة طلبك بسبب قيود السياسات."
+                    if lang == "ar"
+                    else "I'm sorry, I cannot process your request due to policy restrictions."
+                ),
                 status="completed",
             )
 
@@ -338,19 +352,31 @@ async def chat_endpoint(
             request.message, user_id=current_user["user_id"], session_id=session_id
         )
 
+        # If the agent responded in Arabic, prefer that for downstream messages
+        lang = _detect_language(response_text or request.message or "")
+
         # 5) Guardrails output
         is_safe_output, filtered = await check_guardrails_output(response_text)
         final_response = (
-            filtered if (is_safe_output and filtered is not None) else "Response blocked by policy rules."
+            filtered if (is_safe_output and filtered is not None) else (
+                "تم حظر الرد وفقًا لقواعد السياسات."
+                if lang == "ar"
+                else "Response blocked by policy rules."
+            )
         )
 
-        return ChatResponse(response=final_response or "No response generated", status="completed")
+        return ChatResponse(
+            response=final_response or (
+                "لم يتم إنشاء أي رد."
+                if lang == "ar"
+                else "No response generated"
+            ),
+            status="completed"
+        )
 
     except Exception as e:
         logger.exception(f"Error in chat endpoint: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
-
-
 # =========================
 # Startup Hook
 # =========================

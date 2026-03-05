@@ -12,7 +12,7 @@ Required hub installs (examples):
   guardrails hub install hub://guardrails/detect_pii
   guardrails hub install hub://guardrails/secrets_present
   guardrails hub install hub://guardrails/toxic_language
-  guardrails hub install hub://guardrails/gibberish_text
+  guardrails hub install hub://guardrails/toxic_language
   guardrails hub install hub://tryolabs/restricttotopic
 """
 
@@ -39,7 +39,6 @@ from guardrails.hub import (
     RestrictToTopic,
     ToxicLanguage,
     SecretsPresent,
-    GibberishText,
 )
 
 app = FastAPI(
@@ -84,7 +83,6 @@ class GuardrailsConfigState:
     detect_pii_input: bool = True
     secrets_present_input: bool = True
     toxic_language: bool = True
-    gibberish_text: bool = True
     
     detect_pii_output: bool = True
     secrets_present_output: bool = True
@@ -117,7 +115,6 @@ class GuardrailsConfigRequest(BaseModel):
     detect_pii_input: Optional[bool] = None
     secrets_present_input: Optional[bool] = None
     toxic_language: Optional[bool] = None
-    gibberish_text: Optional[bool] = None
     detect_pii_output: Optional[bool] = None
     secrets_present_output: Optional[bool] = None
     is_safe_output: Optional[bool] = None
@@ -132,7 +129,6 @@ class GuardrailsConfigResponse(BaseModel):
     detect_pii_input: bool
     secrets_present_input: bool
     toxic_language: bool
-    gibberish_text: bool
     detect_pii_output: bool
     secrets_present_output: bool
     is_safe_output: bool
@@ -293,8 +289,6 @@ def startup_event() -> None:
         input_validators.append(SecretsPresent(on_fail="exception"))
     if config.toxic_language:
         input_validators.append(ToxicLanguage(threshold=0.5, validation_method="sentence", on_fail="exception"))
-    if config.gibberish_text:
-        input_validators.append(GibberishText(threshold=0.5, validation_method="sentence", on_fail="exception"))
 
     if config.detect_pii_output:
         output_validators.append(DetectPII(pii_entities=PII_ENTITIES, on_fail="exception"))
@@ -393,7 +387,6 @@ def get_config() -> GuardrailsConfigResponse:
         detect_pii_input=config.detect_pii_input,
         secrets_present_input=config.secrets_present_input,
         toxic_language=config.toxic_language,
-        gibberish_text=config.gibberish_text,
         detect_pii_output=config.detect_pii_output,
         secrets_present_output=config.secrets_present_output,
         is_safe_output=config.is_safe_output,
@@ -420,7 +413,6 @@ def update_config(payload: GuardrailsConfigRequest) -> GuardrailsConfigResponse:
         detect_pii_input=config.detect_pii_input,
         secrets_present_input=config.secrets_present_input,
         toxic_language=config.toxic_language,
-        gibberish_text=config.gibberish_text,
         detect_pii_output=config.detect_pii_output,
         secrets_present_output=config.secrets_present_output,
         is_safe_output=config.is_safe_output,

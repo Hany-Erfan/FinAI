@@ -23,7 +23,6 @@ interface GuardrailsConfig {
     detect_pii_input: boolean;
     secrets_present_input: boolean;
     toxic_language: boolean;
-    gibberish_text: boolean;
     detect_pii_output: boolean;
     secrets_present_output: boolean;
     is_safe_output: boolean;
@@ -43,7 +42,6 @@ const validatorDescriptions: Record<string, string> = {
     detect_pii_input: "Scans for and blocks sensitive Personal Identifiable Information (PII) like emails, phone numbers, and SSNs from being processed by the LLM.",
     secrets_present_input: "Detects the presence of sensitive credentials, API keys, or passwords in the user's message to prevent accidental exposure.",
     toxic_language: "Filters out offensive, hateful, or inappropriate language using a dedicated toxicity classifier to maintain a professional environment.",
-    gibberish_text: "Blocks non-human or randomly generated text strings that often indicate bot activity or intentional model confusion attempts.",
     detect_pii_output: "Ensures the AI agent does not inadvertently leak sensitive data in its response, providing a final layer of protection for customer privacy.",
     secrets_present_output: "Verifies that the AI's generated response doesn't contain any internal system keys, tokens, or back-end secrets.",
     is_safe_output: "A final catch-all safety check to ensure the response is helpful, professional, and doesn't contain any restricted content."
@@ -230,6 +228,31 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
         });
     };
 
+    const handleSelectAllValidators = () => {
+        if (!config) return;
+        const newConfig = { ...config };
+        Object.keys(validatorDescriptions).forEach(key => {
+            (newConfig as any)[key] = true;
+        });
+        setConfig(newConfig);
+    };
+
+    const handleDeselectAllValidators = () => {
+        if (!config) return;
+        const newConfig = { ...config };
+        Object.keys(validatorDescriptions).forEach(key => {
+            (newConfig as any)[key] = false;
+        });
+        setConfig(newConfig);
+    };
+
+    const handleRemoveAllTopics = () => {
+        if (!config) return;
+        if (window.confirm("Are you sure you want to remove all valid topics?")) {
+            setConfig({ ...config, valid_topics: [] });
+        }
+    };
+
     const handleSaveConfig = async () => {
         if (!config) return;
         setSavingConfig(true);
@@ -274,100 +297,168 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
             </section>
 
             <section className="section-card">
-                <h3>Guardrails Configuration</h3>
-                <p style={{ marginBottom: '1rem', fontSize: '0.9rem', color: '#555' }}>Toggle validation rules on or off dynamically.</p>
+                <h2>Guardrails Configuration</h2>
+                <p style={{ marginBottom: '1.5rem', fontSize: '0.9rem', color: '#555' }}>Manage the AI agent's validation rules and allowed topics.</p>
 
                 {config ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
-                            {Object.entries(config)
-                                .filter(([key]) => key !== 'valid_topics')
-                                .map(([key, value]) => (
-                                    <div key={key} className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, position: 'relative' }}>
-                                        <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '36px', height: '18px' }}>
-                                            <input
-                                                type="checkbox"
-                                                checked={value as boolean}
-                                                onChange={() => handleConfigToggle(key as keyof GuardrailsConfig)}
-                                                style={{ opacity: 0, width: 0, height: 0 }}
-                                            />
-                                            <span className="slider round" style={{
-                                                position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
-                                                backgroundColor: value ? '#2ecc71' : '#ccc', transition: '.4s', borderRadius: '34px'
-                                            }}>
-                                                <span style={{
-                                                    position: 'absolute', content: '""', height: '14px', width: '14px',
-                                                    left: value ? '19px' : '3px', bottom: '2px', backgroundColor: 'white',
-                                                    transition: '.4s', borderRadius: '50%'
-                                                }} />
-                                            </span>
-                                        </label>
-                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }} onClick={() => setActiveTooltip(activeTooltip === key ? null : key)}>
-                                            <span style={{ fontSize: '0.85rem', textTransform: 'capitalize', color: '#333', fontWeight: 500 }}>
-                                                {key.split('_').join(' ')}
-                                            </span>
-                                            <span
-                                                style={{
-                                                    background: '#3498db', border: 'none', borderRadius: '50%',
-                                                    width: '14px', height: '14px', fontSize: '10px',
-                                                    display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white',
-                                                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                                                }}
-                                            >
-                                                ?
-                                            </span>
-                                        </div>
-                                        {activeTooltip === key && (
-                                            <div
-                                                style={{
-                                                    position: 'absolute', top: '100%', left: '0', right: '0', zIndex: 100,
-                                                    background: '#2c3e50', color: '#ecf0f1', padding: '0.75rem', borderRadius: '8px',
-                                                    fontSize: '0.75rem', marginTop: '6px', lineHeight: '1.4',
-                                                    boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
-                                                    border: '1px solid #34495e'
-                                                }}
-                                                onClick={() => setActiveTooltip(null)}
-                                            >
-                                                <div style={{ fontWeight: 'bold', marginBottom: '4px', textTransform: 'capitalize', color: '#3498db' }}>{key.split('_').join(' ')}</div>
-                                                {validatorDescriptions[key] || "No description available."}
-                                                <div style={{ marginTop: '6px', fontSize: '0.65rem', color: '#bdc3c7', textAlign: 'right', fontStyle: 'italic' }}>Click to close</div>
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                        </div>
-
-                        <div>
-                            <h4>Dynamic Topics</h4>
-                            <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.5rem' }}>These topics are permitted by the Restrict To Topic validation when enabled.</p>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
-                                {config.valid_topics.map((topic: string) => (
-                                    <span key={topic} style={{ background: '#e1f5fe', color: '#0277bd', padding: '0.3rem 0.6rem', borderRadius: '16px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                        {topic}
-                                        <button onClick={() => handleRemoveTopic(topic)} style={{ background: 'none', border: 'none', color: '#0277bd', cursor: 'pointer', outline: 'none', padding: 0, fontSize: '1rem', lineHeight: 1 }}>&times;</button>
-                                    </span>
-                                ))}
+                        <section className="section-card" style={{ marginBottom: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                <h3 style={{ margin: 0 }}>Validator Enforcement</h3>
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
+                                        onClick={handleSelectAllValidators}
+                                    >
+                                        Enable All
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
+                                        onClick={handleDeselectAllValidators}
+                                    >
+                                        Disable All
+                                    </button>
+                                </div>
                             </div>
-                            <div style={{ display: 'flex', gap: '0.5rem', maxWidth: '400px' }}>
+                            <p style={{ marginBottom: '1.5rem', fontSize: '0.85rem', color: '#666' }}>Enable or disable specific validation rules for the AI agent.</p>
+
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(3, 1fr)', // Fixed 3-column layout for stability
+                                gap: '1.25rem'
+                            }}>
+                                {Object.entries(config)
+                                    .filter(([key]) => key !== 'valid_topics')
+                                    .map(([key, value]) => (
+                                        <div key={key} className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, position: 'relative' }}>
+                                            <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '36px', height: '18px', flexShrink: 0 }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={value as boolean}
+                                                    onChange={() => handleConfigToggle(key as keyof GuardrailsConfig)}
+                                                    style={{ opacity: 0, width: 0, height: 0 }}
+                                                />
+                                                <span className="slider round" style={{
+                                                    position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
+                                                    backgroundColor: value ? '#2ecc71' : '#ccc', transition: '.4s', borderRadius: '34px'
+                                                }}>
+                                                    <span style={{
+                                                        position: 'absolute', content: '""', height: '14px', width: '14px',
+                                                        left: value ? '19px' : '3px', bottom: '2px', backgroundColor: 'white',
+                                                        transition: '.4s', borderRadius: '50%'
+                                                    }} />
+                                                </span>
+                                            </label>
+                                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', minWidth: 0 }} onClick={() => setActiveTooltip(activeTooltip === key ? null : key)}>
+                                                <span style={{
+                                                    fontSize: '0.8rem',
+                                                    textTransform: 'capitalize',
+                                                    color: '#333',
+                                                    fontWeight: 500,
+                                                    whiteSpace: 'nowrap',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis'
+                                                }}>
+                                                    {key.split('_').join(' ')}
+                                                </span>
+                                                <span
+                                                    style={{
+                                                        background: '#3498db', border: 'none', borderRadius: '50%',
+                                                        width: '14px', height: '14px', fontSize: '10px', flexShrink: 0,
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white',
+                                                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                                                    }}
+                                                >
+                                                    ?
+                                                </span>
+                                            </div>
+                                            {activeTooltip === key && (
+                                                <div
+                                                    style={{
+                                                        position: 'absolute', top: '100%', left: '0', zIndex: 100,
+                                                        width: '280px',
+                                                        background: '#2c3e50', color: '#ecf0f1', padding: '0.75rem', borderRadius: '8px',
+                                                        fontSize: '0.75rem', marginTop: '6px', lineHeight: '1.4',
+                                                        boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+                                                        border: '1px solid #34495e'
+                                                    }}
+                                                    onClick={() => setActiveTooltip(null)}
+                                                >
+                                                    <div style={{ fontWeight: 'bold', marginBottom: '4px', textTransform: 'capitalize', color: '#3498db' }}>{key.split('_').join(' ')}</div>
+                                                    {validatorDescriptions[key] || "No description available."}
+                                                    <div style={{ marginTop: '6px', fontSize: '0.65rem', color: '#bdc3c7', textAlign: 'right', fontStyle: 'italic' }}>Click to close</div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                            </div>
+                        </section>
+
+                        <section className="section-card" style={{ marginTop: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                <h3 style={{ margin: 0 }}>Valid Topics Management</h3>
+                                {config.valid_topics.length > 0 && (
+                                    <button
+                                        type="button"
+                                        className="btn btn-danger"
+                                        style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
+                                        onClick={handleRemoveAllTopics}
+                                    >
+                                        Remove All Topics
+                                    </button>
+                                )}
+                            </div>
+                            <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: '1rem' }}>These topics define the allowed scope for user inquiries.</p>
+
+                            <div style={{
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                gap: '0.5rem',
+                                marginBottom: '1.5rem',
+                                minHeight: '44px',
+                                background: '#f9f9f9',
+                                padding: '0.75rem',
+                                borderRadius: '8px',
+                                border: '1px solid #eee'
+                            }}>
+                                {config.valid_topics.length === 0 ? (
+                                    <span style={{ color: '#999', fontSize: '0.8rem', fontStyle: 'italic' }}>No topics configured. All topics will be restricted.</span>
+                                ) : (
+                                    config.valid_topics.map((topic: string) => (
+                                        <span key={topic} style={{ background: '#e1f5fe', color: '#0277bd', padding: '0.3rem 0.75rem', borderRadius: '16px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem', border: '1px solid #b3e5fc' }}>
+                                            {topic}
+                                            <button onClick={() => handleRemoveTopic(topic)} style={{ background: 'none', border: 'none', color: '#01579b', cursor: 'pointer', outline: 'none', padding: 0, fontSize: '1.1rem', lineHeight: 1, fontWeight: 'bold' }}>&times;</button>
+                                        </span>
+                                    ))
+                                )}
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '0.5rem', maxWidth: '450px' }}>
                                 <input
                                     type="text"
                                     className="form-control"
                                     value={newTopic}
                                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewTopic(e.target.value)}
-                                    placeholder="Enter new topic"
+                                    placeholder="Enter new banking topic (e.g. Loans)"
                                     onKeyPress={(e: React.KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && handleAddTopic()}
                                 />
-                                <button onClick={handleAddTopic} className="btn btn-secondary">Add</button>
+                                <button onClick={handleAddTopic} className="btn btn-secondary" style={{ whiteSpace: 'nowrap' }}>Add Topic</button>
                             </div>
-                        </div>
+                        </section>
 
-                        <button onClick={handleSaveConfig} disabled={savingConfig} className="btn btn-primary" style={{ alignSelf: 'flex-start' }}>
-                            {savingConfig ? 'Saving...' : 'Save Configuration'}
-                        </button>
+                        <div style={{ display: 'flex', justifyContent: 'flex-start', padding: '0 1.5rem 2rem' }}>
+                            <button onClick={handleSaveConfig} disabled={savingConfig} className="btn btn-primary" style={{ minWidth: '200px', boxShadow: '0 4px 6px rgba(0,123,255,0.2)' }}>
+                                {savingConfig ? 'Saving...' : 'Save Configuration'}
+                            </button>
+                        </div>
                     </div>
                 ) : (
-                    <p>Loading configuration...</p>
+                    <p style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>Loading Guardrails configuration...</p>
                 )}
             </section>
 
