@@ -19,7 +19,7 @@ Required hub installs (examples):
 from __future__ import annotations
 
 import os
-from typing import Optional, Callable, Tuple
+from typing import Optional, Callable, Tuple, List
 
 import uvicorn
 from fastapi import FastAPI
@@ -72,25 +72,71 @@ class ValidationResponse(BaseModel):
 
 
 # ---------------------------------------------------------
-# Dynamic Threshold Configurations
+# Dynamic Configurations
 # ---------------------------------------------------------
 
-class ThresholdState:
-    restrict_to_topic: float = 0.25
-    toxic_language: float = 0.6
-    gibberish_text: float = 0.6
+class GuardrailsConfigState:
+    is_safe_input: bool = True
+    enforce_anonymous_mode: bool = True
+    block_financial_advisory: bool = True
+    escalation_trigger: bool = True
+    restrict_to_topic: bool = True
+    detect_pii_input: bool = True
+    secrets_present_input: bool = True
+    toxic_language: bool = True
+    gibberish_text: bool = True
+    
+    detect_pii_output: bool = True
+    secrets_present_output: bool = True
+    is_safe_output: bool = True
 
-thresholds = ThresholdState()
+    valid_topics: List[str] = [
+        "bank accounts",
+        "online banking access",
+        "login and password reset",
+        "account balances and transactions",
+        "deposits",
+        "payments and transfers",
+        "wire transfers",
+        "bank cards",
+        "fees and charges",
+        "branch and atm information",
+        "routing number and swift/iban",
+        "opening a new account",
+        "loans and mortgages",
+    ]
 
-class ThresholdUpdateRequest(BaseModel):
-    restrict_to_topic: Optional[float] = None
-    toxic_language: Optional[float] = None
-    gibberish_text: Optional[float] = None
+config = GuardrailsConfigState()
 
-class ThresholdResponse(BaseModel):
-    restrict_to_topic: float
-    toxic_language: float
-    gibberish_text: float
+class GuardrailsConfigRequest(BaseModel):
+    is_safe_input: Optional[bool] = None
+    enforce_anonymous_mode: Optional[bool] = None
+    block_financial_advisory: Optional[bool] = None
+    escalation_trigger: Optional[bool] = None
+    restrict_to_topic: Optional[bool] = None
+    detect_pii_input: Optional[bool] = None
+    secrets_present_input: Optional[bool] = None
+    toxic_language: Optional[bool] = None
+    gibberish_text: Optional[bool] = None
+    detect_pii_output: Optional[bool] = None
+    secrets_present_output: Optional[bool] = None
+    is_safe_output: Optional[bool] = None
+    valid_topics: Optional[List[str]] = None
+
+class GuardrailsConfigResponse(BaseModel):
+    is_safe_input: bool
+    enforce_anonymous_mode: bool
+    block_financial_advisory: bool
+    escalation_trigger: bool
+    restrict_to_topic: bool
+    detect_pii_input: bool
+    secrets_present_input: bool
+    toxic_language: bool
+    gibberish_text: bool
+    detect_pii_output: bool
+    secrets_present_output: bool
+    is_safe_output: bool
+    valid_topics: List[str]
 
 
 # ---------------------------------------------------------
@@ -158,25 +204,6 @@ class IsSafeOutput(Validator):
 
 PII_ENTITIES = ["EMAIL_ADDRESS", "PHONE_NUMBER", "CREDIT_CARD", "IBAN_CODE", "US_SSN"]
 
-# Broader, more realistic banking topics/phrases + greetings/small talk so basic chat isn't blocked
-# RestrictToTopic works best with short semantic topic labels (categories),
-# not greetings/keywords/phrases.
-VALID_TOPICS = [
-    "bank accounts",
-    "online banking access",
-    "login and password reset",
-    "account balances and transactions",
-    "deposits",
-    "payments and transfers",
-    "wire transfers",
-    "bank cards",
-    "fees and charges",
-    "branch and atm information",
-    "routing number and swift/iban",
-    "opening a new account",
-    "loans and mortgages",
-]
-
 
 def _build_global_gemini_llm_callable() -> Tuple[Optional[str], Optional[Callable[[str], str]]]:
     """
@@ -224,51 +251,45 @@ def startup_event() -> None:
     llm_model, llm_callable = _build_global_gemini_llm_callable()
     use_llm = llm_callable is not None
 
-    # INPUT
-    # Uses BOTH fixes:
-    #  1) expanded VALID_TOPICS including greetings/small talk
-    #  2) RestrictToTopic is soft (on_fail="noop") so casual chat isn't blocked
-        # Decide whether RestrictToTopic should hard-block or soft-fail based on slider
-    restrict_on_fail = "exception" if thresholds.restrict_to_topic >= 0.5 else "noop"
+    input_validators = []
+    output_validators = []
 
-    input_guard = (
-        Guard()
-        .use(
-            IsSafeInput(on_fail="exception"),
-            EnforceAnonymousMode(on_fail="exception"),
-            BlockFinancialAdvisory(on_fail="exception"),
-            EscalationTrigger(on_fail="exception"),
+    if config.is_safe_input:
+        input_validators.append(IsSafeInput(on_fail="exception"))
+    if config.enforce_anonymous_mode:
+        input_validators.append(EnforceAnonymousMode(on_fail="exception"))
+    if config.block_financial_advisory:
+        input_validators.append(BlockFinancialAdvisory(on_fail="exception"))
+    if config.escalation_trigger:
+        input_validators.append(EscalationTrigger(on_fail="exception"))
+    if config.restrict_to_topic:
+        input_validators.append(RestrictToTopic(
+            valid_topics=config.valid_topics,
+            invalid_topics=[],
+            disable_classifier=False,
+            disable_llm=not use_llm,
+            llm_callable=llm_callable if use_llm else None,
+            model_threshold=0.5,
+            on_fail="exception",
+        ))
+    if config.detect_pii_input:
+        input_validators.append(DetectPII(pii_entities=PII_ENTITIES, on_fail="exception"))
+    if config.secrets_present_input:
+        input_validators.append(SecretsPresent(on_fail="exception"))
+    if config.toxic_language:
+        input_validators.append(ToxicLanguage(threshold=0.5, validation_method="sentence", on_fail="exception"))
+    if config.gibberish_text:
+        input_validators.append(GibberishText(threshold=0.5, validation_method="sentence", on_fail="exception"))
 
-            RestrictToTopic(
-                valid_topics=VALID_TOPICS,
-                invalid_topics=[],
-                disable_classifier=False,
-                disable_llm=not use_llm,
-                llm_callable=llm_callable if use_llm else None,
-                model_threshold=thresholds.restrict_to_topic,
-                on_fail=restrict_on_fail,
-            ),
+    if config.detect_pii_output:
+        output_validators.append(DetectPII(pii_entities=PII_ENTITIES, on_fail="exception"))
+    if config.secrets_present_output:
+        output_validators.append(SecretsPresent(on_fail="exception"))
+    if config.is_safe_output:
+        output_validators.append(IsSafeOutput(on_fail="exception"))
 
-            DetectPII(pii_entities=PII_ENTITIES, on_fail="exception"),
-
-            # Don't hard-block on secrets for normal user messages
-            SecretsPresent(on_fail="exception"),
-
-            ToxicLanguage(threshold=thresholds.toxic_language, validation_method="sentence", on_fail="exception"),
-            GibberishText(threshold=thresholds.gibberish_text, validation_method="sentence", on_fail="exception"),
-        )
-    )
-
-
-    # OUTPUT (keep strict)
-    output_guard = (
-        Guard()
-        .use(
-            DetectPII(pii_entities=PII_ENTITIES, on_fail="exception"),
-            SecretsPresent(on_fail="exception"),
-            IsSafeOutput(on_fail="exception"),
-        )
-    )
+    input_guard = Guard().use(*input_validators) if input_validators else Guard()
+    output_guard = Guard().use(*output_validators) if output_validators else Guard()
 
     if llm_model:
         print(f"[GUARDRAILS] RestrictToTopic LLM fallback enabled via GUARDRAILS_LLM_MODEL={llm_model!r}")
@@ -331,31 +352,50 @@ def check_output(payload: ValidationRequest) -> ValidationResponse:
         return ValidationResponse(is_safe=False, filtered_message=None, reason=_extract_reason(e))
 
 
-@app.get("/thresholds", response_model=ThresholdResponse)
-def get_thresholds() -> ThresholdResponse:
-    return ThresholdResponse(
-        restrict_to_topic=thresholds.restrict_to_topic,
-        toxic_language=thresholds.toxic_language,
-        gibberish_text=thresholds.gibberish_text
+@app.get("/config", response_model=GuardrailsConfigResponse)
+def get_config() -> GuardrailsConfigResponse:
+    # use vars(config) if config.__dict__ fails. Or since it's an instance of a dataclass/simple object:
+    return GuardrailsConfigResponse(
+        is_safe_input=config.is_safe_input,
+        enforce_anonymous_mode=config.enforce_anonymous_mode,
+        block_financial_advisory=config.block_financial_advisory,
+        escalation_trigger=config.escalation_trigger,
+        restrict_to_topic=config.restrict_to_topic,
+        detect_pii_input=config.detect_pii_input,
+        secrets_present_input=config.secrets_present_input,
+        toxic_language=config.toxic_language,
+        gibberish_text=config.gibberish_text,
+        detect_pii_output=config.detect_pii_output,
+        secrets_present_output=config.secrets_present_output,
+        is_safe_output=config.is_safe_output,
+        valid_topics=config.valid_topics
     )
 
 
-@app.post("/thresholds", response_model=ThresholdResponse)
-def update_thresholds(payload: ThresholdUpdateRequest) -> ThresholdResponse:
-    if payload.restrict_to_topic is not None:
-        thresholds.restrict_to_topic = payload.restrict_to_topic
-    if payload.toxic_language is not None:
-        thresholds.toxic_language = payload.toxic_language
-    if payload.gibberish_text is not None:
-        thresholds.gibberish_text = payload.gibberish_text
+@app.post("/config", response_model=GuardrailsConfigResponse)
+def update_config(payload: GuardrailsConfigRequest) -> GuardrailsConfigResponse:
+    data = payload.dict(exclude_unset=True)
+    for key, value in data.items():
+        if hasattr(config, key):
+            setattr(config, key, value)
 
-    # Re-initialize guards with new thresholds
+    # Re-initialize guards with new configuration
     startup_event()
 
-    return ThresholdResponse(
-        restrict_to_topic=thresholds.restrict_to_topic,
-        toxic_language=thresholds.toxic_language,
-        gibberish_text=thresholds.gibberish_text
+    return GuardrailsConfigResponse(
+        is_safe_input=config.is_safe_input,
+        enforce_anonymous_mode=config.enforce_anonymous_mode,
+        block_financial_advisory=config.block_financial_advisory,
+        escalation_trigger=config.escalation_trigger,
+        restrict_to_topic=config.restrict_to_topic,
+        detect_pii_input=config.detect_pii_input,
+        secrets_present_input=config.secrets_present_input,
+        toxic_language=config.toxic_language,
+        gibberish_text=config.gibberish_text,
+        detect_pii_output=config.detect_pii_output,
+        secrets_present_output=config.secrets_present_output,
+        is_safe_output=config.is_safe_output,
+        valid_topics=config.valid_topics
     )
 
 

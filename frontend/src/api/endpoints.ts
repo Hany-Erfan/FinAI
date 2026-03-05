@@ -13,6 +13,6 @@ export const Endpoints = {
   CURRENT_USER: `${API_BASE}/currentUser`,
   LOGOUT: `${API_BASE}/logout`,
   ADMIN_MANAGEMENT: `${API_BASE}/admin/management`,
-  GUARDRAILS_THRESHOLDS: `${GUARDRAILS_BASE}/thresholds`
+  GUARDRAILS_CONFIG: `${GUARDRAILS_BASE}/config`
 } as const;
 

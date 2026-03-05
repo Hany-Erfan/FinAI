@@ -14,6 +14,22 @@ interface Product {
     answer_ar: string;
 }
 
+interface GuardrailsConfig {
+    is_safe_input: boolean;
+    enforce_anonymous_mode: boolean;
+    block_financial_advisory: boolean;
+    escalation_trigger: boolean;
+    restrict_to_topic: boolean;
+    detect_pii_input: boolean;
+    secrets_present_input: boolean;
+    toxic_language: boolean;
+    gibberish_text: boolean;
+    detect_pii_output: boolean;
+    secrets_present_output: boolean;
+    is_safe_output: boolean;
+    valid_topics: string[];
+}
+
 interface BackofficeProps {
     sessionId: string;
 }
@@ -32,12 +48,9 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
         answer_ar: ''
     });
 
-    const [thresholds, setThresholds] = useState({
-        restrict_to_topic: 0.25,
-        toxic_language: 0.6,
-        gibberish_text: 0.6
-    });
-    const [savingThresholds, setSavingThresholds] = useState(false);
+    const [config, setConfig] = useState<GuardrailsConfig | null>(null);
+    const [savingConfig, setSavingConfig] = useState(false);
+    const [newTopic, setNewTopic] = useState('');
 
     const navigate = useNavigate();
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -52,17 +65,17 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
 
     useEffect(() => {
         fetchProducts();
-        fetchThresholds();
+        fetchConfig();
     }, []);
 
-    const fetchThresholds = async () => {
+    const fetchConfig = async () => {
         try {
-            const res = await axios.get(Endpoints.GUARDRAILS_THRESHOLDS, axiosConfig);
+            const res = await axios.get(Endpoints.GUARDRAILS_CONFIG, axiosConfig);
             if (res.data) {
-                setThresholds(res.data);
+                setConfig(res.data);
             }
         } catch (err) {
-            console.error("Failed to fetch thresholds", err);
+            console.error("Failed to fetch configuration", err);
         }
     };
 
@@ -177,22 +190,43 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
         setShowModal(true);
     };
 
-    const handleThresholdChange = (key: keyof typeof thresholds, value: number) => {
-        setThresholds(prev => ({ ...prev, [key]: value }));
+    const handleConfigToggle = (key: keyof GuardrailsConfig) => {
+        if (!config) return;
+        setConfig({ ...config, [key]: !config[key as keyof GuardrailsConfig] });
     };
 
-    const handleSaveThresholds = async () => {
-        setSavingThresholds(true);
+    const handleAddTopic = () => {
+        if (!config || !newTopic.trim()) return;
+        if (!config.valid_topics.includes(newTopic.trim())) {
+            setConfig({
+                ...config,
+                valid_topics: [...config.valid_topics, newTopic.trim()]
+            });
+        }
+        setNewTopic('');
+    };
+
+    const handleRemoveTopic = (topic: string) => {
+        if (!config) return;
+        setConfig({
+            ...config,
+            valid_topics: config.valid_topics.filter((t: string) => t !== topic)
+        });
+    };
+
+    const handleSaveConfig = async () => {
+        if (!config) return;
+        setSavingConfig(true);
         try {
-            const res = await axios.post(Endpoints.GUARDRAILS_THRESHOLDS, thresholds, axiosConfig);
+            const res = await axios.post(Endpoints.GUARDRAILS_CONFIG, config, axiosConfig);
             if (res.data) {
-                setThresholds(res.data);
-                setMessage("Success: Guardrails thresholds updated!");
+                setConfig(res.data);
+                setMessage("Success: Guardrails configuration updated!");
             }
         } catch (err: any) {
-            setMessage('Error: Failed to save thresholds - ' + (err.response?.data?.detail || err.response?.data?.error || err.message));
+            setMessage('Error: Failed to save config - ' + (err.response?.data?.detail || err.response?.data?.error || err.message));
         } finally {
-            setSavingThresholds(false);
+            setSavingConfig(false);
         }
     };
 
@@ -224,37 +258,73 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
             </section>
 
             <section className="section-card">
-                <h3>Guardrails Strictness Thresholds</h3>
-                <p style={{ marginBottom: '1rem', fontSize: '0.9rem', color: '#555' }}>Adjust the confidence thresholds for the guardrails validation hubs. Lower thresholds are more strict.</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '400px' }}>
-                    <div className="form-group">
-                        <label>Restrict To Topic Threshold: {thresholds.restrict_to_topic}</label>
-                        <input type="range" min="0" max="1" step="0.01"
-                            value={thresholds.restrict_to_topic}
-                            onChange={(e) => handleThresholdChange('restrict_to_topic', parseFloat(e.target.value))}
-                            style={{ width: '100%' }}
-                        />
+                <h3>Guardrails Configuration</h3>
+                <p style={{ marginBottom: '1rem', fontSize: '0.9rem', color: '#555' }}>Toggle validation rules on or off dynamically.</p>
+
+                {config ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
+                            {Object.entries(config)
+                                .filter(([key]) => key !== 'valid_topics')
+                                .map(([key, value]) => (
+                                    <div key={key} className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                                        <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '40px', height: '20px' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={value as boolean}
+                                                onChange={() => handleConfigToggle(key as keyof GuardrailsConfig)}
+                                                style={{ opacity: 0, width: 0, height: 0 }}
+                                            />
+                                            <span className="slider round" style={{
+                                                position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
+                                                backgroundColor: value ? '#2ecc71' : '#ccc', transition: '.4s', borderRadius: '34px'
+                                            }}>
+                                                <span style={{
+                                                    position: 'absolute', content: '""', height: '16px', width: '16px',
+                                                    left: value ? '22px' : '2px', bottom: '2px', backgroundColor: 'white',
+                                                    transition: '.4s', borderRadius: '50%'
+                                                }} />
+                                            </span>
+                                        </label>
+                                        <span style={{ fontSize: '0.9rem', textTransform: 'capitalize' }}>
+                                            {key.split('_').join(' ')}
+                                        </span>
+                                    </div>
+                                ))}
+                        </div>
+
+                        <div>
+                            <h4>Dynamic Topics</h4>
+                            <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.5rem' }}>These topics are permitted by the Restrict To Topic validation when enabled.</p>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+                                {config.valid_topics.map((topic: string) => (
+                                    <span key={topic} style={{ background: '#e1f5fe', color: '#0277bd', padding: '0.3rem 0.6rem', borderRadius: '16px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        {topic}
+                                        <button onClick={() => handleRemoveTopic(topic)} style={{ background: 'none', border: 'none', color: '#0277bd', cursor: 'pointer', outline: 'none', padding: 0, fontSize: '1rem', lineHeight: 1 }}>&times;</button>
+                                    </span>
+                                ))}
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.5rem', maxWidth: '400px' }}>
+                                <input
+                                    type="text"
+                                    className="form-control"
+                                    value={newTopic}
+                                    onChange={e => setNewTopic(e.target.value)}
+                                    placeholder="Enter new topic"
+                                    onKeyPress={(e: React.KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && handleAddTopic()}
+                                />
+                                <button onClick={handleAddTopic} className="btn btn-secondary">Add</button>
+                            </div>
+                        </div>
+
+                        <button onClick={handleSaveConfig} disabled={savingConfig} className="btn btn-primary" style={{ alignSelf: 'flex-start' }}>
+                            {savingConfig ? 'Saving...' : 'Save Configuration'}
+                        </button>
                     </div>
-                    <div className="form-group">
-                        <label>Toxic Language Threshold: {thresholds.toxic_language}</label>
-                        <input type="range" min="0" max="1" step="0.01"
-                            value={thresholds.toxic_language}
-                            onChange={(e) => handleThresholdChange('toxic_language', parseFloat(e.target.value))}
-                            style={{ width: '100%' }}
-                        />
-                    </div>
-                    <div className="form-group">
-                        <label>Gibberish Text Threshold: {thresholds.gibberish_text}</label>
-                        <input type="range" min="0" max="1" step="0.01"
-                            value={thresholds.gibberish_text}
-                            onChange={(e) => handleThresholdChange('gibberish_text', parseFloat(e.target.value))}
-                            style={{ width: '100%' }}
-                        />
-                    </div>
-                </div>
-                <button onClick={handleSaveThresholds} disabled={savingThresholds} className="btn btn-primary" style={{ marginTop: '1rem' }}>
-                    {savingThresholds ? 'Saving...' : 'Save Strictness'}
-                </button>
+                ) : (
+                    <p>Loading configuration...</p>
+                )}
             </section>
 
             <section className="section-card">
