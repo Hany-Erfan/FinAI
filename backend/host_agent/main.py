@@ -311,12 +311,12 @@ async def record_summary(request: Request,
     messages = repo.get_messages(session_id)
     if not messages:
         logger.error("Session has no messages to summarise.")
+        return {"status": "no messages to summarise"}
     else:
         if not session_id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing session id")
         transcript = build_transcript(messages)
         safe_transcript = repo.masker.mask(transcript)
-        # 4) just call get_response_from_agent (global runner)
         await get_response_from_agent(
         f'summarize the following {session_id}:{safe_transcript}', user_id=current_user["user_id"], session_id=session_id
         )
@@ -396,15 +396,6 @@ async def chat_endpoint(
 
         # If the agent responded in Arabic, prefer that for downstream messages
         lang = detect_language(response_text or request.message or "")
-        # Mask model reply before DB storage
-       # masked_reply = repo.masker.mask(response_text)
-       # print('masked_reply', masked_reply)
-
-        repo.save_message(
-            session_id=session_id,
-            role=MessageRole.MODEL,
-            content=response_text,
-        )
 
         # 5) Guardrails output
         is_safe_output, filtered = await check_guardrails_output(response_text)
@@ -418,12 +409,12 @@ async def chat_endpoint(
 
         # 6) Mask model reply before DB storage
         masked_reply = repo.masker.mask(response_text)
-
         repo.save_message(
             session_id=session_id,
             role=MessageRole.MODEL,
             content=masked_reply,
         )
+
         return ChatResponse(
             response=final_response or (
                 "لم يتم تلقي أي رد"

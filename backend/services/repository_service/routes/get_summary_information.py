@@ -1,6 +1,4 @@
 from http.client import HTTPException
-import logging
-import uuid
 
 from pydantic import BaseModel
 

@@ -31,7 +31,8 @@ services:
         condition: service_started
       guardrails-service:
         condition: service_healthy
-      - postgres_db
+      postgres_db:
+        condition: service_healthy
     environment:
       - PYTHONUNBUFFERED=1
       - UVICORN_LOG_LEVEL=debug

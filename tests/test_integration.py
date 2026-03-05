@@ -6,6 +6,7 @@ import os
 HOST_AGENT_URL = os.getenv("HOST_AGENT_URL", "http://localhost:8000")
 FAQ_AGENT_URL = os.getenv("FAQ_AGENT_URL", "http://localhost:8001")
 RETAIL_AGENT_URL = os.getenv("RETAIL_AGENT_URL", "http://localhost:8002")
+SUMMARY_AGENT_URL = os.getenv("SUMMARY_AGENT_URL", "http://localhost:8003")
 VECTOR_DB_URL = os.getenv("VECTOR_DB_URL", "http://localhost:8004")
 
 @pytest.mark.asyncio
@@ -27,6 +28,13 @@ async def test_retail_agent_health():
     async with httpx.AsyncClient() as client:
         # Agents use Starlette and have a /health route
         response = await client.get(f"{RETAIL_AGENT_URL}/health")
+        assert response.status_code == 200
+
+@pytest.mark.asyncio
+async def test_summary_agent_health():
+    async with httpx.AsyncClient() as client:
+        # Agents use Starlette and have a /health route
+        response = await client.get(f"{SUMMARY_AGENT_URL}/health")
         assert response.status_code == 200
 
 @pytest.mark.asyncio

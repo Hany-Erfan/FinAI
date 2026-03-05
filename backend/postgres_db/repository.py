@@ -4,7 +4,6 @@ messages, and summaries. Keeps SQL concerns out of agent logic.
 """
 from __future__ import annotations
 
-import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -57,7 +56,6 @@ class SessionRepository:
         session.ended_at = datetime.now(timezone.utc)
         self.db.commit()
         self.db.refresh(session)
-        print('session id logged out')
         return session
 
     def get_session(self, session_id: uuid.UUID) -> Optional[Session]:

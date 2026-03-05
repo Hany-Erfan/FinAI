@@ -1,5 +1,4 @@
 import json
-import logging
 from typing import Any
 import httpx
 from backend.services.repository_service.routes.get_summary_information import SummaryPayload

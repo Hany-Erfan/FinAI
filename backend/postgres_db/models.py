@@ -7,7 +7,6 @@ Tables:
   summaries  – one row per session, generated on-demand or at session end
 """
 import uuid
-from datetime import datetime
 
 from sqlalchemy import (
     Column, DateTime, Enum, ForeignKey,

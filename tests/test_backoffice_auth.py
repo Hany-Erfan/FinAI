@@ -13,6 +13,31 @@ ADMIN_PASSWORD = "admin_AgentixBuddy"
 USER_USERNAME = "user"
 USER_PASSWORD = "user_AgentixBuddy"
 
+# --------------------------
+# Fake repository
+# --------------------------
+
+class FakeRepository:
+    def create_session(self, user_id, user_name, session_id):
+        return {"user_id": user_id, "session_id": session_id, "user_name": user_name}
+
+# --------------------------
+# Dependency overrides
+# --------------------------
+class FakeRepository:
+    def __init__(self):
+        self.sessions = []
+
+    def create_session(self, user_id, user_name, session_id):
+        self.sessions.append({
+            "user_id": user_id,
+            "user_name": user_name,
+            "session_id": session_id
+        })
+        return self.sessions[-1]
+
+    def last_session(self):
+        return self.sessions[-1] if self.sessions else None
 
 class TestBackofficeAuth:
     """Test suite for backoffice authentication and authorization."""
@@ -21,6 +46,7 @@ class TestBackofficeAuth:
     async def admin_session(self):
         """Login as admin and return session cookies and session_id."""
         session_id = "test-admin-session-integration"
+        fake_repo = FakeRepository()
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"{HOST_AGENT_URL}/login",
@@ -33,6 +59,13 @@ class TestBackofficeAuth:
             assert response.status_code == 200
             data = response.json()
             assert data["role"] == "admin"
+            # Simulate session creation
+            fake_repo.create_session(
+                user_id="admin-id",
+                user_name=ADMIN_USERNAME,
+                session_id=session_id
+            )
+            assert fake_repo.last_session()["session_id"] == session_id
             return {
                 "cookies": response.cookies,
                 "session_id": session_id

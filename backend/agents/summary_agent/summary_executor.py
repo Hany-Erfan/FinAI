@@ -74,7 +74,6 @@ class SummaryExecutor(AgentExecutor):
         session_state = self._prepare_session_state(
             jwt_token, user_id
         )
-        logging.info(f'session_id {session_id}')
         # Create or get session
         session_obj = await summary_agent._get_or_create_session(
             user_id=user_id,
