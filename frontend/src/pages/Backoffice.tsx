@@ -427,7 +427,7 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
                                 border: '1px solid #eee'
                             }}>
                                 {config.valid_topics.length === 0 ? (
-                                    <span style={{ color: '#999', fontSize: '0.8rem', fontStyle: 'italic' }}>No topics configured. All topics will be restricted.</span>
+                                    <span style={{ color: '#999', fontSize: '0.8rem', fontStyle: 'italic' }}>No topics configured.</span>
                                 ) : (
                                     config.valid_topics.map((topic: string) => (
                                         <span key={topic} style={{ background: '#e1f5fe', color: '#0277bd', padding: '0.3rem 0.75rem', borderRadius: '16px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem', border: '1px solid #b3e5fc' }}>
