@@ -12,7 +12,6 @@ Required hub installs (examples):
   guardrails hub install hub://guardrails/detect_pii
   guardrails hub install hub://guardrails/secrets_present
   guardrails hub install hub://guardrails/toxic_language
-  guardrails hub install hub://guardrails/toxic_language
   guardrails hub install hub://tryolabs/restricttotopic
 """
 
@@ -37,7 +36,6 @@ from guardrails.validators import (
 from guardrails.hub import (
     DetectPII,
     RestrictToTopic,
-    ToxicLanguage,
     SecretsPresent,
 )
 
@@ -83,7 +81,7 @@ class GuardrailsConfigState:
     detect_pii_input: bool = True
     secrets_present_input: bool = True
     toxic_language: bool = True
-    
+
     detect_pii_output: bool = True
     secrets_present_output: bool = True
     is_safe_output: bool = True
@@ -194,6 +192,34 @@ class IsSafeOutput(Validator):
         return PassResult()
 
 
+@register_validator(name="llm-toxic", data_type="string")
+class LlmToxic(Validator):
+    def validate(self, value: str, metadata: dict = {}) -> ValidationResult:
+        llm = (metadata or {}).get("llm_callable")
+
+        # If no LLM callable is configured, don't block traffic here.
+        # (Keep behavior minimal; rely on other validators.)
+        if llm is None:
+            return PassResult()
+
+        prompt = (
+            "You are a safety classifier. Analyze the following user text and decide if it contains toxic language "
+            "(insults, harassment, hate, profanity directed at a person/group, threats). "
+            "Return ONLY one token: 'TOXIC' or 'OK'.\n\n"
+            f"TEXT:\n{value}\n"
+        )
+
+        try:
+            result = (llm(prompt) or "").strip().upper()
+        except Exception as e:
+            return FailResult(error_message=f"LLM toxicity check failed: {type(e).__name__}: {e}")
+
+        if result.startswith("TOXIC"):
+            return FailResult(error_message="Toxic language detected (LLM multilingual).")
+
+        return PassResult()
+
+
 # ---------------------------------------------------------
 # Hub Validator Configuration
 # ---------------------------------------------------------
@@ -246,6 +272,9 @@ def _build_global_gemini_llm_callable() -> Tuple[Optional[str], Optional[Callabl
     return model, llm_callable
 
 
+    return model, llm_callable
+
+
 input_guard: Optional[Guard] = None
 output_guard: Optional[Guard] = None
 
@@ -288,7 +317,7 @@ def startup_event() -> None:
     if config.secrets_present_input:
         input_validators.append(SecretsPresent(on_fail="exception"))
     if config.toxic_language:
-        input_validators.append(ToxicLanguage(threshold=0.5, validation_method="sentence", on_fail="exception"))
+        input_validators.append(LlmToxic(on_fail="exception"))
 
     if config.detect_pii_output:
         output_validators.append(DetectPII(pii_entities=PII_ENTITIES, on_fail="exception"))
@@ -329,8 +358,16 @@ def check_input(payload: ValidationRequest) -> ValidationResponse:
         return ValidationResponse(is_safe=False, filtered_message=None, reason="Guards not initialized.")
 
     try:
+        llm_model, llm_callable = _build_global_gemini_llm_callable()
         print(f"[GUARDRAILS][INPUT] validate start msg_len={len(payload.message)}")
-        outcome = input_guard.validate(payload.message)
+
+        # Provide llm callable to custom validators via metadata.
+        outcome = input_guard.validate(
+            payload.message,
+            metadata={
+                "llm_callable": llm_callable,
+            },
+        )
         print(f"[GUARDRAILS][INPUT] validate end passed={bool(outcome.validation_passed)}")
 
         # If ALL validators passed normally
@@ -362,8 +399,16 @@ def check_output(payload: ValidationRequest) -> ValidationResponse:
         return ValidationResponse(is_safe=False, filtered_message=None, reason="Guards not initialized.")
 
     try:
+        llm_model, llm_callable = _build_global_gemini_llm_callable()
         print(f"[GUARDRAILS][OUTPUT] validate start msg_len={len(payload.message)}")
-        outcome = output_guard.validate(payload.message)
+
+        # Provide llm callable to custom validators via metadata.
+        outcome = output_guard.validate(
+            payload.message,
+            metadata={
+                "llm_callable": llm_callable,
+            },
+        )
         print(f"[GUARDRAILS][OUTPUT] validate end passed={bool(outcome.validation_passed)}")
         return ValidationResponse(
             is_safe=bool(outcome.validation_passed),

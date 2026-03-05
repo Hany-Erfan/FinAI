@@ -41,7 +41,7 @@ const validatorDescriptions: Record<string, string> = {
     restrict_to_topic: "Uses semantic analysis to ensure the user's query is relevant to the allowed banking topics. Messages outside these topics will be blocked.",
     detect_pii_input: "Scans for and blocks sensitive Personal Identifiable Information (PII) like emails, phone numbers, and SSNs from being processed by the LLM.",
     secrets_present_input: "Detects the presence of sensitive credentials, API keys, or passwords in the user's message to prevent accidental exposure.",
-    toxic_language: "Filters out offensive, hateful, or inappropriate language using a dedicated toxicity classifier to maintain a professional environment.",
+    toxic_language: "Uses an advanced multilingual LLM to filter out offensive, hateful, or inappropriate language to maintain a professional environment.",
     detect_pii_output: "Ensures the AI agent does not inadvertently leak sensitive data in its response, providing a final layer of protection for customer privacy.",
     secrets_present_output: "Verifies that the AI's generated response doesn't contain any internal system keys, tokens, or back-end secrets.",
     is_safe_output: "A final catch-all safety check to ensure the response is helpful, professional, and doesn't contain any restricted content."
