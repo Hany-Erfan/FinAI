@@ -272,9 +272,6 @@ def _build_global_gemini_llm_callable() -> Tuple[Optional[str], Optional[Callabl
     return model, llm_callable
 
 
-    return model, llm_callable
-
-
 input_guard: Optional[Guard] = None
 output_guard: Optional[Guard] = None
 
