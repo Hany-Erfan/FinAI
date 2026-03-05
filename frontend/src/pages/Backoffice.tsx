@@ -34,6 +34,21 @@ interface BackofficeProps {
     sessionId: string;
 }
 
+const validatorDescriptions: Record<string, string> = {
+    is_safe_input: "Analyzes user input for common LLM injection patterns, prompt leakage attempts, and dangerous command keywords like 'DROP TABLE' or 'BYPASS'.",
+    enforce_anonymous_mode: "Ensures privacy by blocking requests that contain phrases related to personal bank accounts, balances, or specific transactions, keeping the session anonymous.",
+    block_financial_advisory: "Prevents the model from giving specific investment advice or recommending financial products beyond general information, mitigating legal risks.",
+    escalation_trigger: "Monitors for high-sensitivity keywords like 'fraud', 'stolen', or 'lawsuit', and automatically flags the conversation for immediate human intervention.",
+    restrict_to_topic: "Uses semantic analysis to ensure the user's query is relevant to the allowed banking topics. Messages outside these topics will be blocked.",
+    detect_pii_input: "Scans for and blocks sensitive Personal Identifiable Information (PII) like emails, phone numbers, and SSNs from being processed by the LLM.",
+    secrets_present_input: "Detects the presence of sensitive credentials, API keys, or passwords in the user's message to prevent accidental exposure.",
+    toxic_language: "Filters out offensive, hateful, or inappropriate language using a dedicated toxicity classifier to maintain a professional environment.",
+    gibberish_text: "Blocks non-human or randomly generated text strings that often indicate bot activity or intentional model confusion attempts.",
+    detect_pii_output: "Ensures the AI agent does not inadvertently leak sensitive data in its response, providing a final layer of protection for customer privacy.",
+    secrets_present_output: "Verifies that the AI's generated response doesn't contain any internal system keys, tokens, or back-end secrets.",
+    is_safe_output: "A final catch-all safety check to ensure the response is helpful, professional, and doesn't contain any restricted content."
+};
+
 export default function Backoffice({ sessionId }: BackofficeProps) {
     const [products, setProducts] = useState<Product[]>([]);
     const [file, setFile] = useState<File | null>(null);
@@ -51,6 +66,7 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
     const [config, setConfig] = useState<GuardrailsConfig | null>(null);
     const [savingConfig, setSavingConfig] = useState(false);
     const [newTopic, setNewTopic] = useState('');
+    const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
 
     const navigate = useNavigate();
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -268,8 +284,8 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
                             {Object.entries(config)
                                 .filter(([key]) => key !== 'valid_topics')
                                 .map(([key, value]) => (
-                                    <div key={key} className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-                                        <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '40px', height: '20px' }}>
+                                    <div key={key} className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, position: 'relative' }}>
+                                        <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '36px', height: '18px' }}>
                                             <input
                                                 type="checkbox"
                                                 checked={value as boolean}
@@ -281,15 +297,43 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
                                                 backgroundColor: value ? '#2ecc71' : '#ccc', transition: '.4s', borderRadius: '34px'
                                             }}>
                                                 <span style={{
-                                                    position: 'absolute', content: '""', height: '16px', width: '16px',
-                                                    left: value ? '22px' : '2px', bottom: '2px', backgroundColor: 'white',
+                                                    position: 'absolute', content: '""', height: '14px', width: '14px',
+                                                    left: value ? '19px' : '3px', bottom: '2px', backgroundColor: 'white',
                                                     transition: '.4s', borderRadius: '50%'
                                                 }} />
                                             </span>
                                         </label>
-                                        <span style={{ fontSize: '0.9rem', textTransform: 'capitalize' }}>
-                                            {key.split('_').join(' ')}
-                                        </span>
+                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }} onClick={() => setActiveTooltip(activeTooltip === key ? null : key)}>
+                                            <span style={{ fontSize: '0.85rem', textTransform: 'capitalize', color: '#333', fontWeight: 500 }}>
+                                                {key.split('_').join(' ')}
+                                            </span>
+                                            <span
+                                                style={{
+                                                    background: '#3498db', border: 'none', borderRadius: '50%',
+                                                    width: '14px', height: '14px', fontSize: '10px',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white',
+                                                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                                                }}
+                                            >
+                                                ?
+                                            </span>
+                                        </div>
+                                        {activeTooltip === key && (
+                                            <div
+                                                style={{
+                                                    position: 'absolute', top: '100%', left: '0', right: '0', zIndex: 100,
+                                                    background: '#2c3e50', color: '#ecf0f1', padding: '0.75rem', borderRadius: '8px',
+                                                    fontSize: '0.75rem', marginTop: '6px', lineHeight: '1.4',
+                                                    boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+                                                    border: '1px solid #34495e'
+                                                }}
+                                                onClick={() => setActiveTooltip(null)}
+                                            >
+                                                <div style={{ fontWeight: 'bold', marginBottom: '4px', textTransform: 'capitalize', color: '#3498db' }}>{key.split('_').join(' ')}</div>
+                                                {validatorDescriptions[key] || "No description available."}
+                                                <div style={{ marginTop: '6px', fontSize: '0.65rem', color: '#bdc3c7', textAlign: 'right', fontStyle: 'italic' }}>Click to close</div>
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                         </div>
@@ -310,7 +354,7 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
                                     type="text"
                                     className="form-control"
                                     value={newTopic}
-                                    onChange={e => setNewTopic(e.target.value)}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewTopic(e.target.value)}
                                     placeholder="Enter new topic"
                                     onKeyPress={(e: React.KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && handleAddTopic()}
                                 />
