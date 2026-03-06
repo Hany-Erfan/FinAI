@@ -367,7 +367,7 @@ async def chat_endpoint(
 
         return ChatResponse(
             response=final_response or (
-                "مافيش رد."
+                "لم يتم تلقي أي رد"
                 if lang == "ar"
                 else "No response generated"
             ),
