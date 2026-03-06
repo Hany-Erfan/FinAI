@@ -3,7 +3,6 @@
 # ----------------------------
 GOOGLE_API_KEY=blabla
 QDRANT_API_KEY=blabla
-TENDER_BUCKET_PREFIX=local
 
 # (Optional, only used internally by ADK runner)
 DEFAULT_USER_ID=2
