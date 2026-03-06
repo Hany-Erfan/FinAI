@@ -1,5 +1,6 @@
 export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 export const VECTOR_DB_BASE = import.meta.env.VITE_VECTOR_DB_URL || 'http://localhost:8004/vector_db_service';
+export const GUARDRAILS_BASE = import.meta.env.VITE_GUARDRAILS_URL || 'http://localhost:8005';
 
 export const Endpoints = {
   LOGIN: `${API_BASE}/login`,
@@ -11,5 +12,7 @@ export const Endpoints = {
   BACKOFFICE_UPSERT: `${VECTOR_DB_BASE}/upsert`,
   CURRENT_USER: `${API_BASE}/currentUser`,
   LOGOUT: `${API_BASE}/logout`,
-  ADMIN_MANAGEMENT: `${API_BASE}/admin/management`
+  ADMIN_MANAGEMENT: `${API_BASE}/admin/management`,
+  GUARDRAILS_CONFIG: `${GUARDRAILS_BASE}/config`
 } as const;
+

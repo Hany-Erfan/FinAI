@@ -14,6 +14,8 @@ jobs:
       GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY || 'dummy_key' }}
       ORCHESTRATOR_GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY || 'dummy_key' }}
       SERVICES_GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY || 'dummy_key' }}
+      GUARDRAILS_API_KEY: ${{ secrets.GUARDRAILS_API_KEY }}
+      GUARDRAILS_LLM_MODEL: ${{ secrets.GUARDRAILS_LLM_MODEL || 'gemini/gemini-1.5-flash' }}
       LANGFUSE_SECRET_KEY: dummy
       LANGFUSE_PUBLIC_KEY: dummy
       LANGFUSE_BASE_URL: http://localhost:3000
@@ -32,14 +34,42 @@ jobs:
 
       - name: Build and start services
         run: |
+          set +e
           docker-compose up -d --build
+          UP_EXIT=$?
 
-      - name: Wait for services to be ready
-        run: |
-          echo "Waiting for services to start..."
-          # Give it some time to start up
-          sleep 30
+          echo "docker-compose up exit code: $UP_EXIT"
+          echo "Sleeping 20s so logs can accumulate..."
+          sleep 20
+
+          echo "==== docker-compose ps ===="
           docker-compose ps
+
+          echo "==== host-agent inspect ===="
+          docker inspect host-agent || true
+
+          echo "==== host-agent logs ===="
+          docker-compose logs --no-color host-agent || true
+
+          echo "==== guardrails-service logs ===="
+          docker-compose logs --no-color guardrails-service || true
+
+          echo "==== retail-agent logs ===="
+          docker-compose logs --no-color retail-agent || true
+
+          echo "==== bank-server logs ===="
+          docker-compose logs --no-color bank-server || true
+
+          echo "==== faq-agent logs ===="
+          docker-compose logs --no-color faq-agent || true
+
+          echo "==== vector-db-service logs ===="
+          docker-compose logs --no-color vector-db-service || true
+
+          if [ "$UP_EXIT" -ne 0 ]; then
+            echo "docker-compose up failed"
+            exit "$UP_EXIT"
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -58,6 +88,12 @@ jobs:
       - name: Run Backoffice Auth Tests
         run: |
           pytest tests/test_backoffice_auth.py -v
+
+      - name: Dump container logs on failure
+        if: failure()
+        run: |
+          docker-compose ps
+          docker-compose logs --no-color
 
       - name: Cleanup
         if: always()

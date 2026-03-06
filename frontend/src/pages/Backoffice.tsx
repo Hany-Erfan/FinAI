@@ -14,9 +14,38 @@ interface Product {
     answer_ar: string;
 }
 
+interface GuardrailsConfig {
+    is_safe_input: boolean;
+    enforce_anonymous_mode: boolean;
+    block_financial_advisory: boolean;
+    escalation_trigger: boolean;
+    restrict_to_topic: boolean;
+    detect_pii_input: boolean;
+    secrets_present_input: boolean;
+    toxic_language: boolean;
+    detect_pii_output: boolean;
+    secrets_present_output: boolean;
+    is_safe_output: boolean;
+    valid_topics: string[];
+}
+
 interface BackofficeProps {
     sessionId: string;
 }
+
+const validatorDescriptions: Record<string, string> = {
+    is_safe_input: "Analyzes user input for common LLM injection patterns, prompt leakage attempts, and dangerous command keywords like 'DROP TABLE' or 'BYPASS'.",
+    enforce_anonymous_mode: "Ensures privacy by blocking requests that contain phrases related to personal bank accounts, balances, or specific transactions, keeping the session anonymous.",
+    block_financial_advisory: "Prevents the model from giving specific investment advice or recommending financial products beyond general information, mitigating legal risks.",
+    escalation_trigger: "Monitors for high-sensitivity keywords like 'fraud', 'stolen', or 'lawsuit', and automatically flags the conversation for immediate human intervention.",
+    restrict_to_topic: "Uses semantic analysis to ensure the user's query is relevant to the allowed banking topics. Messages outside these topics will be blocked.",
+    detect_pii_input: "Scans for and blocks sensitive Personal Identifiable Information (PII) like emails, phone numbers, and SSNs from being processed by the LLM.",
+    secrets_present_input: "Detects the presence of sensitive credentials, API keys, or passwords in the user's message to prevent accidental exposure.",
+    toxic_language: "Uses an advanced multilingual LLM to filter out offensive, hateful, or inappropriate language to maintain a professional environment.",
+    detect_pii_output: "Ensures the AI agent does not inadvertently leak sensitive data in its response, providing a final layer of protection for customer privacy.",
+    secrets_present_output: "Verifies that the AI's generated response doesn't contain any internal system keys, tokens, or back-end secrets.",
+    is_safe_output: "A final catch-all safety check to ensure the response is helpful, professional, and doesn't contain any restricted content."
+};
 
 export default function Backoffice({ sessionId }: BackofficeProps) {
     const [products, setProducts] = useState<Product[]>([]);
@@ -32,6 +61,11 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
         answer_ar: ''
     });
 
+    const [config, setConfig] = useState<GuardrailsConfig | null>(null);
+    const [savingConfig, setSavingConfig] = useState(false);
+    const [newTopic, setNewTopic] = useState('');
+    const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
+
     const navigate = useNavigate();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -45,7 +79,19 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
 
     useEffect(() => {
         fetchProducts();
+        fetchConfig();
     }, []);
+
+    const fetchConfig = async () => {
+        try {
+            const res = await axios.get(Endpoints.GUARDRAILS_CONFIG, axiosConfig);
+            if (res.data) {
+                setConfig(res.data);
+            }
+        } catch (err) {
+            console.error("Failed to fetch configuration", err);
+        }
+    };
 
     const fetchProducts = async () => {
         try {
@@ -158,6 +204,72 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
         setShowModal(true);
     };
 
+    const handleConfigToggle = (key: keyof GuardrailsConfig) => {
+        if (!config) return;
+        setConfig({ ...config, [key]: !config[key as keyof GuardrailsConfig] });
+    };
+
+    const handleAddTopic = () => {
+        if (!config || !newTopic.trim()) return;
+        if (!config.valid_topics.includes(newTopic.trim())) {
+            setConfig({
+                ...config,
+                valid_topics: [...config.valid_topics, newTopic.trim()]
+            });
+        }
+        setNewTopic('');
+    };
+
+    const handleRemoveTopic = (topic: string) => {
+        if (!config) return;
+        setConfig({
+            ...config,
+            valid_topics: config.valid_topics.filter((t: string) => t !== topic)
+        });
+    };
+
+    const handleSelectAllValidators = () => {
+        if (!config) return;
+        const newConfig = { ...config };
+        Object.keys(validatorDescriptions).forEach(key => {
+            (newConfig as any)[key] = true;
+        });
+        setConfig(newConfig);
+    };
+
+    const handleDeselectAllValidators = () => {
+        if (!config) return;
+        const newConfig = { ...config };
+        Object.keys(validatorDescriptions).forEach(key => {
+            (newConfig as any)[key] = false;
+        });
+        setConfig(newConfig);
+    };
+
+    const handleRemoveAllTopics = () => {
+        if (!config) return;
+        if (window.confirm("Are you sure you want to remove all valid topics?")) {
+            setConfig({ ...config, valid_topics: [] });
+        }
+    };
+
+    const handleSaveConfig = async () => {
+        if (!config) return;
+        setSavingConfig(true);
+        try {
+            const res = await axios.post(Endpoints.GUARDRAILS_CONFIG, config, axiosConfig);
+            if (res.data) {
+                setConfig(res.data);
+                setMessage("Success: Guardrails configuration updated!");
+            }
+        } catch (err: any) {
+            setMessage('Error: Failed to save config - ' + (err.response?.data?.detail || err.response?.data?.error || err.message));
+        } finally {
+            setSavingConfig(false);
+        }
+    };
+
+
     return (
         <div className="backoffice-container">
             <header className="backoffice-header">
@@ -182,6 +294,172 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
                         {loading ? 'Uploading...' : 'Ingest File'}
                     </button>
                 </div>
+            </section>
+
+            <section className="section-card">
+                <h2>Guardrails Configuration</h2>
+                <p style={{ marginBottom: '1.5rem', fontSize: '0.9rem', color: '#555' }}>Manage the AI agent's validation rules and allowed topics.</p>
+
+                {config ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+
+                        <section className="section-card" style={{ marginBottom: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                <h3 style={{ margin: 0 }}>Validator Enforcement</h3>
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
+                                        onClick={handleSelectAllValidators}
+                                    >
+                                        Enable All
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
+                                        onClick={handleDeselectAllValidators}
+                                    >
+                                        Disable All
+                                    </button>
+                                </div>
+                            </div>
+                            <p style={{ marginBottom: '1.5rem', fontSize: '0.85rem', color: '#666' }}>Enable or disable specific validation rules for the AI agent.</p>
+
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(3, 1fr)', // Fixed 3-column layout for stability
+                                gap: '1.25rem'
+                            }}>
+                                {Object.entries(config)
+                                    .filter(([key]) => key !== 'valid_topics')
+                                    .map(([key, value]) => (
+                                        <div key={key} className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, position: 'relative' }}>
+                                            <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '36px', height: '18px', flexShrink: 0 }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={value as boolean}
+                                                    onChange={() => handleConfigToggle(key as keyof GuardrailsConfig)}
+                                                    style={{ opacity: 0, width: 0, height: 0 }}
+                                                />
+                                                <span className="slider round" style={{
+                                                    position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
+                                                    backgroundColor: value ? '#2ecc71' : '#ccc', transition: '.4s', borderRadius: '34px'
+                                                }}>
+                                                    <span style={{
+                                                        position: 'absolute', content: '""', height: '14px', width: '14px',
+                                                        left: value ? '19px' : '3px', bottom: '2px', backgroundColor: 'white',
+                                                        transition: '.4s', borderRadius: '50%'
+                                                    }} />
+                                                </span>
+                                            </label>
+                                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', minWidth: 0 }} onClick={() => setActiveTooltip(activeTooltip === key ? null : key)}>
+                                                <span style={{
+                                                    fontSize: '0.8rem',
+                                                    textTransform: 'capitalize',
+                                                    color: '#333',
+                                                    fontWeight: 500,
+                                                    whiteSpace: 'nowrap',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis'
+                                                }}>
+                                                    {key.split('_').join(' ')}
+                                                </span>
+                                                <span
+                                                    style={{
+                                                        background: '#3498db', border: 'none', borderRadius: '50%',
+                                                        width: '14px', height: '14px', fontSize: '10px', flexShrink: 0,
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white',
+                                                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                                                    }}
+                                                >
+                                                    ?
+                                                </span>
+                                            </div>
+                                            {activeTooltip === key && (
+                                                <div
+                                                    style={{
+                                                        position: 'absolute', top: '100%', left: '0', zIndex: 100,
+                                                        width: '280px',
+                                                        background: '#2c3e50', color: '#ecf0f1', padding: '0.75rem', borderRadius: '8px',
+                                                        fontSize: '0.75rem', marginTop: '6px', lineHeight: '1.4',
+                                                        boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+                                                        border: '1px solid #34495e'
+                                                    }}
+                                                    onClick={() => setActiveTooltip(null)}
+                                                >
+                                                    <div style={{ fontWeight: 'bold', marginBottom: '4px', textTransform: 'capitalize', color: '#3498db' }}>{key.split('_').join(' ')}</div>
+                                                    {validatorDescriptions[key] || "No description available."}
+                                                    <div style={{ marginTop: '6px', fontSize: '0.65rem', color: '#bdc3c7', textAlign: 'right', fontStyle: 'italic' }}>Click to close</div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                            </div>
+                        </section>
+
+                        <section className="section-card" style={{ marginTop: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                <h3 style={{ margin: 0 }}>Valid Topics Management</h3>
+                                {config.valid_topics.length > 0 && (
+                                    <button
+                                        type="button"
+                                        className="btn btn-danger"
+                                        style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
+                                        onClick={handleRemoveAllTopics}
+                                    >
+                                        Remove All Topics
+                                    </button>
+                                )}
+                            </div>
+                            <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: '1rem' }}>These topics define the allowed scope for user inquiries.</p>
+
+                            <div style={{
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                gap: '0.5rem',
+                                marginBottom: '1.5rem',
+                                minHeight: '44px',
+                                background: '#f9f9f9',
+                                padding: '0.75rem',
+                                borderRadius: '8px',
+                                border: '1px solid #eee'
+                            }}>
+                                {config.valid_topics.length === 0 ? (
+                                    <span style={{ color: '#999', fontSize: '0.8rem', fontStyle: 'italic' }}>No topics configured.</span>
+                                ) : (
+                                    config.valid_topics.map((topic: string) => (
+                                        <span key={topic} style={{ background: '#e1f5fe', color: '#0277bd', padding: '0.3rem 0.75rem', borderRadius: '16px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem', border: '1px solid #b3e5fc' }}>
+                                            {topic}
+                                            <button onClick={() => handleRemoveTopic(topic)} style={{ background: 'none', border: 'none', color: '#01579b', cursor: 'pointer', outline: 'none', padding: 0, fontSize: '1.1rem', lineHeight: 1, fontWeight: 'bold' }}>&times;</button>
+                                        </span>
+                                    ))
+                                )}
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '0.5rem', maxWidth: '450px' }}>
+                                <input
+                                    type="text"
+                                    className="form-control"
+                                    value={newTopic}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewTopic(e.target.value)}
+                                    placeholder="Enter new banking topic (e.g. Loans)"
+                                    onKeyPress={(e: React.KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && handleAddTopic()}
+                                />
+                                <button onClick={handleAddTopic} className="btn btn-secondary" style={{ whiteSpace: 'nowrap' }}>Add Topic</button>
+                            </div>
+                        </section>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-start', padding: '0 1.5rem 2rem' }}>
+                            <button onClick={handleSaveConfig} disabled={savingConfig} className="btn btn-primary" style={{ minWidth: '200px', boxShadow: '0 4px 6px rgba(0,123,255,0.2)' }}>
+                                {savingConfig ? 'Saving...' : 'Save Configuration'}
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <p style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>Loading Guardrails configuration...</p>
+                )}
             </section>
 
             <section className="section-card">
