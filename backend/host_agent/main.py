@@ -219,6 +219,7 @@ async def get_response_from_agent(message: str, user_id: str, session_id: str) -
 
 def get_chat_respository(db = Depends(get_db)) -> SessionRepository:
     return SessionRepository(db = db, masker= DataMasker())
+
 def detect_language(text: str) -> str:
     # Lightweight script-based detection (Arabic vs default English)
     # Arabic Unicode blocks: \u0600-\u06FF, \u0750-\u077F, \u08A0-\u08FF
@@ -332,8 +333,17 @@ async def chat_endpoint(
     try:        
 
         lang = detect_language(request.message or "")
+        session_id = request.session_id
 
-        # 1) Guardrails input
+        # 1) Mask user's message before DB storage 
+        masked_user_message = repo.masker.mask(request.message)
+        repo.save_message(
+            session_id=session_id,
+            role=MessageRole.USER,
+            content=masked_user_message,
+        )
+
+        # 2) Guardrails input
         is_safe_input = await check_guardrails_input(request.message)
         if not is_safe_input:
             return ChatResponse(
@@ -344,16 +354,6 @@ async def chat_endpoint(
                 ),
                 status="completed",
             )
-
-        session_id = request.session_id
-
-        # 2) Mask user's message before DB storage 
-        masked_user_message = repo.masker.mask(request.message)
-        repo.save_message(
-            session_id=session_id,
-            role=MessageRole.USER,
-            content=masked_user_message,
-        )
 
         # 3) Create/update ADK session state
         session = await SESSION_SERVICE.get_session(
@@ -394,10 +394,18 @@ async def chat_endpoint(
             request.message, user_id=current_user["user_id"], session_id=session_id
         )
 
+        # 5) Mask model reply before DB storage
+        masked_reply = repo.masker.mask(response_text)
+        repo.save_message(
+            session_id=session_id,
+            role=MessageRole.MODEL,
+            content=masked_reply,
+        )
+
         # If the agent responded in Arabic, prefer that for downstream messages
         lang = detect_language(response_text or request.message or "")
 
-        # 5) Guardrails output
+        # 6) Guardrails output
         is_safe_output, filtered = await check_guardrails_output(response_text)
         final_response = (
             filtered if (is_safe_output and filtered is not None) else (
@@ -405,14 +413,6 @@ async def chat_endpoint(
                 if lang == "ar"
                 else "Response blocked by policy rules."
             )
-        )
-
-        # 6) Mask model reply before DB storage
-        masked_reply = repo.masker.mask(response_text)
-        repo.save_message(
-            session_id=session_id,
-            role=MessageRole.MODEL,
-            content=masked_reply,
         )
 
         return ChatResponse(
