@@ -213,6 +213,14 @@ async def get_response_from_agent(message: str, user_id: str, session_id: str) -
         traceback.print_exc()
         return f"An error occurred while processing your request: {str(e)}"
 
+def detect_language(text: str) -> str:
+    # Lightweight script-based detection (Arabic vs default English)
+    # Arabic Unicode blocks: \u0600-\u06FF, \u0750-\u077F, \u08A0-\u08FF
+    for ch in text:
+        o = ord(ch)
+        if (0x0600 <= o <= 0x06FF) or (0x0750 <= o <= 0x077F) or (0x08A0 <= o <= 0x08FF):
+            return "ar"
+    return "en"
 
 # =========================
 # API Endpoints
@@ -287,17 +295,9 @@ async def chat_endpoint(
     current_user=Depends(get_current_user),
     _: None = Depends(verify_csrf),
 ):
-    try:
-        def _detect_language(text: str) -> str:
-            # Lightweight script-based detection (Arabic vs default English)
-            # Arabic Unicode blocks: \u0600-\u06FF, \u0750-\u077F, \u08A0-\u08FF
-            for ch in text:
-                o = ord(ch)
-                if (0x0600 <= o <= 0x06FF) or (0x0750 <= o <= 0x077F) or (0x08A0 <= o <= 0x08FF):
-                    return "ar"
-            return "en"
+    try:        
 
-        lang = _detect_language(request.message or "")
+        lang = detect_language(request.message or "")
 
         # 1) Guardrails input
         is_safe_input = await check_guardrails_input(request.message)
@@ -353,7 +353,7 @@ async def chat_endpoint(
         )
 
         # If the agent responded in Arabic, prefer that for downstream messages
-        lang = _detect_language(response_text or request.message or "")
+        lang = detect_language(response_text or request.message or "")
 
         # 5) Guardrails output
         is_safe_output, filtered = await check_guardrails_output(response_text)
