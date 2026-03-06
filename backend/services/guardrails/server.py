@@ -443,8 +443,15 @@ def update_config(payload: GuardrailsConfigRequest) -> GuardrailsConfigResponse:
         if hasattr(config, key):
             setattr(config, key, value)
 
-    # Re-initialize guards with new configuration
-    startup_event()
+    try:
+        # Re-initialize guards with new configuration
+        startup_event()
+    except Exception as e:
+        from fastapi import HTTPException
+        error_msg = str(e)
+        if "Either valid topics or invalid topics must be specified" in error_msg:
+            error_msg = "Valid topics must be specified for the Restrict to Topic validator."
+        raise HTTPException(status_code=400, detail=error_msg)
 
     return GuardrailsConfigResponse(
         is_safe_input=config.is_safe_input,
