@@ -32,32 +32,42 @@ jobs:
 
       - name: Build and start services
         run: |
+          set +e
           docker-compose up -d --build
+          UP_EXIT=$?
 
-      - name: Wait for services to be ready
-        run: |
-          echo "Waiting for services to start..."
-          for i in $(seq 1 24); do
-            echo "Check $i/24"
-            docker-compose ps
+          echo "docker-compose up exit code: $UP_EXIT"
+          echo "Sleeping 20s so logs can accumulate..."
+          sleep 20
 
-            if docker ps --format '{{.Names}}' | grep -q '^host-agent$'; then
-              HOST_RUNNING=$(docker inspect --format='{{.State.Running}}' host-agent 2>/dev/null || echo "false")
-              HOST_HEALTH=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' host-agent 2>/dev/null || echo "unknown")
-              echo "host-agent running: $HOST_RUNNING"
-              echo "host-agent health: $HOST_HEALTH"
-            fi
-
-            if docker ps --format '{{.Names}}' | grep -q '^guardrails-service$'; then
-              GUARD_HEALTH=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' guardrails-service 2>/dev/null || echo "unknown")
-              echo "guardrails-service health: $GUARD_HEALTH"
-            fi
-
-            sleep 10
-          done
-
+          echo "==== docker-compose ps ===="
           docker-compose ps
-          docker-compose logs --no-color host-agent guardrails-service faq-agent retail-agent bank-server vector-db-service
+
+          echo "==== host-agent inspect ===="
+          docker inspect host-agent || true
+
+          echo "==== host-agent logs ===="
+          docker-compose logs --no-color host-agent || true
+
+          echo "==== guardrails-service logs ===="
+          docker-compose logs --no-color guardrails-service || true
+
+          echo "==== retail-agent logs ===="
+          docker-compose logs --no-color retail-agent || true
+
+          echo "==== bank-server logs ===="
+          docker-compose logs --no-color bank-server || true
+
+          echo "==== faq-agent logs ===="
+          docker-compose logs --no-color faq-agent || true
+
+          echo "==== vector-db-service logs ===="
+          docker-compose logs --no-color vector-db-service || true
+
+          if [ "$UP_EXIT" -ne 0 ]; then
+            echo "docker-compose up failed"
+            exit "$UP_EXIT"
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
