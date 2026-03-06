@@ -304,7 +304,7 @@ async def chat_endpoint(
         if not is_safe_input:
             return ChatResponse(
                 response=(
-                    "معلش، مش هقدر أنفّذ طلبك بسبب سياسات الاستخدام."
+                    ".أسف ، لا أستطيع تنفيذ طلبك بسبب سياسات الاستخدام"
                     if lang == "ar"
                     else "I'm sorry, I cannot process your request due to policy restrictions."
                 ),
