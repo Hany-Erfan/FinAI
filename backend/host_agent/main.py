@@ -359,7 +359,7 @@ async def chat_endpoint(
         is_safe_output, filtered = await check_guardrails_output(response_text)
         final_response = (
             filtered if (is_safe_output and filtered is not None) else (
-                "ماينفعش أردّ بسبب قواعد الاستخدام."
+                "تم حظر الاستجابة بواسطة قواعد السياسة."
                 if lang == "ar"
                 else "Response blocked by policy rules."
             )
