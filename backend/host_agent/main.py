@@ -304,7 +304,7 @@ async def chat_endpoint(
         if not is_safe_input:
             return ChatResponse(
                 response=(
-                    "عذرًا، لا يمكنني معالجة طلبك بسبب قيود السياسات."
+                    "معلش، مش هقدر أنفّذ طلبك بسبب سياسات الاستخدام."
                     if lang == "ar"
                     else "I'm sorry, I cannot process your request due to policy restrictions."
                 ),
@@ -359,7 +359,7 @@ async def chat_endpoint(
         is_safe_output, filtered = await check_guardrails_output(response_text)
         final_response = (
             filtered if (is_safe_output and filtered is not None) else (
-                "تم حظر الرد وفقًا لقواعد السياسات."
+                "ماينفعش أردّ بسبب قواعد الاستخدام."
                 if lang == "ar"
                 else "Response blocked by policy rules."
             )
@@ -367,7 +367,7 @@ async def chat_endpoint(
 
         return ChatResponse(
             response=final_response or (
-                "لم يتم إنشاء أي رد."
+                "مافيش رد."
                 if lang == "ar"
                 else "No response generated"
             ),
