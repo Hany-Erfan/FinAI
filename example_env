@@ -43,4 +43,4 @@ POSTGRES_USER=agentixBuddy
 POSTGRES_PASSWORD=secret
 POSTGRES_DB=agentixBuddy
 
-DATABASE_URL=postgresql://agentixBuddy:secret@postgres_db:5432/agentixBuddy
+DATABASE_URL=postgresql://agentixBuddy:secret@postgres-db:5432/agentixBuddy

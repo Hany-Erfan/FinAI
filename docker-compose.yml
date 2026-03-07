@@ -31,7 +31,7 @@ services:
         condition: service_started
       guardrails-service:
         condition: service_healthy
-      postgres_db:
+      postgres-db:
         condition: service_healthy
     environment:
       - PYTHONUNBUFFERED=1
@@ -44,7 +44,7 @@ services:
       - RETAIL_AGENT_URL=http://retail-agent:8002
       - SUMMARY_AGENT_URL=http://summary-agent:8003
       - BANK_URL=http://bank-server:8006
-      - DATABASE_URL=postgresql://agentixBuddy:agentixsecret@postgres_db:5432/agentixBuddy
+      - DATABASE_URL=postgresql://agentixBuddy:agentixsecret@postgres-db:5432/agentixBuddy
       - PORT=8000
       - GUARDRAILS_URL=http://guardrails-service:8005
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
@@ -178,7 +178,7 @@ services:
       - UVICORN_LOG_LEVEL=debug
       - LOG_LEVEL=debug
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - DATABASE_URL=postgresql://agentixBuddy:agentixsecret@postgres_db:5432/agentixBuddy
+      - DATABASE_URL=postgresql://agentixBuddy:agentixsecret@postgres-db:5432/agentixBuddy
       - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production-min-32-chars
       - JWT_EXPIRE_MINUTES=480
       - PORT=8007
@@ -245,7 +245,7 @@ services:
     command: >
       python -m backend.services.guardrails.server
 
-  postgres_db:
+  postgres-db:
     image: postgres:16
     container_name: app_postgres
     restart: always

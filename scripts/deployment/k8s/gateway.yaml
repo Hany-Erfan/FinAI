@@ -41,10 +41,30 @@ data:
           proxy_set_header X-Forwarded-Proto $scheme;
         }
 
+        # Repository Service (for db endpoints)
+        location /repository/ {
+          rewrite ^/repository/?(.*)$ /$1 break;
+          proxy_pass http://repository-service:8007;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
         # FAQ Agent
         location /faq-agent/ {
           rewrite ^/faq-agent/?(.*)$ /$1 break;
           proxy_pass http://faq-agent:8001;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # Summary Agent
+        location /summary-agent/ {
+          rewrite ^/summary-agent/?(.*)$ /$1 break;
+          proxy_pass http://summary-agent:8003;
           proxy_set_header Host $host;
           proxy_set_header X-Real-IP $remote_addr;
           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

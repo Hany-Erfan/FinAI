@@ -2,7 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from .models import Base
-engine = create_engine("postgresql://agentixBuddy:agentixsecret@postgres_db:5432/agentixBuddy", pool_pre_ping=True)
+engine = create_engine("postgresql://agentixBuddy:agentixsecret@postgres-db:5432/agentixBuddy", pool_pre_ping=True)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 

@@ -10,7 +10,8 @@ import os
 mcp = FastMCP('summary')
 
 # --- Configuration & Constants ---
-REPO_URL = os.getenv('REPO_URL')
+REPO_URL = os.getenv('REPO_URL', 'http://repository-service:8007')
+
 REQUEST_TIMEOUT = 20.0
 
 # --- Shared HTTP Client ---
