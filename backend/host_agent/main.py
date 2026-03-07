@@ -346,12 +346,19 @@ async def chat_endpoint(
         # 2) Guardrails input
         is_safe_input = await check_guardrails_input(request.message)
         if not is_safe_input:
-            return ChatResponse(
-                response=(
+            response=(
                     ".أسف ، لا أستطيع تنفيذ طلبك بسبب سياسات الاستخدام"
                     if lang == "ar"
                     else "I'm sorry, I cannot process your request due to policy restrictions."
-                ),
+                )
+            repo.save_message(
+                session_id=session_id,
+                role=MessageRole.MODEL,
+                        content=response,
+            )
+
+            return ChatResponse(
+                response=response,
                 status="completed",
             )
 
@@ -394,14 +401,6 @@ async def chat_endpoint(
             request.message, user_id=current_user["user_id"], session_id=session_id
         )
 
-        # 5) Mask model reply before DB storage
-        masked_reply = repo.masker.mask(response_text)
-        repo.save_message(
-            session_id=session_id,
-            role=MessageRole.MODEL,
-            content=masked_reply,
-        )
-
         # If the agent responded in Arabic, prefer that for downstream messages
         lang = detect_language(response_text or request.message or "")
 
@@ -413,6 +412,14 @@ async def chat_endpoint(
                 if lang == "ar"
                 else "Response blocked by policy rules."
             )
+        )
+
+        # 6) Mask model reply before DB storage
+        masked_reply = repo.masker.mask(final_response)
+        repo.save_message(
+            session_id=session_id,
+            role=MessageRole.MODEL,
+            content=masked_reply,
         )
 
         return ChatResponse(

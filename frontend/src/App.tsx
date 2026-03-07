@@ -8,7 +8,7 @@ import { getCurrentUser, login } from './api/login';
 import { logout, summary } from './api/logout';
 
 const TAB_SESSION_KEY = "chat_tab_session_id";
-const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
+const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000;
 
 // Fallback for crypto.randomUUID (not available on HTTP non-localhost)
 function generateUUID(): string {

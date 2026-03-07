@@ -1,4 +1,6 @@
 from backend.services.repository_service.routes.get_summary_information import summary_information_router
+from backend.services.repository_service.routes.get_messages import messages_information_router
+
 import uvicorn
 import os
 from fastapi import FastAPI
@@ -21,7 +23,8 @@ repository_app.add_middleware(
 
 # Include Routers
 routers = [
-    summary_information_router
+    summary_information_router,
+    messages_information_router
 ]
 
 for router in routers:
