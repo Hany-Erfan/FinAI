@@ -32,7 +32,7 @@ function getOrCreateTabSessionId() {
 }
 
 function createNewTabSessionId() {
-  const sessionId = crypto.randomUUID();
+  const sessionId = generateUUID();
   sessionStorage.setItem(TAB_SESSION_KEY, sessionId);
   return sessionId;
 }

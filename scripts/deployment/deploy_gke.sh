@@ -150,11 +150,13 @@ fi
 # ----------------------------
 if [ "${SKIP_DB}" != "1" ]; then
   echo "Deploying Postgres..."
-  kubectl apply -n $NAMESPACE -f "$K8S_DIR/postgres/"
+  kubectl apply -n $NAMESPACE -f "$K8S_DIR/postgres/postgres-secrets.yaml"
+  kubectl apply -n $NAMESPACE -f "$K8S_DIR/postgres/postgres-pvc.yaml"
+  kubectl apply -n $NAMESPACE -f "$K8S_DIR/postgres/postgres-service.yaml"
+  kubectl apply -n $NAMESPACE -f "$K8S_DIR/postgres/postgres.yaml"
 
-  # Wait for Postgres to be ready
   echo "Waiting for Postgres to be ready..."
-  kubectl rollout status statefulset/postgres-db -n $NAMESPACE --timeout=300s
+  kubectl rollout status deployment/postgres-db -n $NAMESPACE --timeout=300s
 else
   echo "Skipping database deployment (SKIP_DB=1)"
 fi
