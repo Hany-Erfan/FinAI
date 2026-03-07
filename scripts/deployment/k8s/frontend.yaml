@@ -27,6 +27,8 @@ spec:
               value: /api
             - name: VITE_VECTOR_DB_URL
               value: /vector-db/vector_db_service
+            - name: VITE_GUARDRAILS_URL
+              value: /guardrails_service
             - name: VITE_REPOSITORY_URL
               value: /repository
           resources:

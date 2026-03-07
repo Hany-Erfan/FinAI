@@ -6,8 +6,10 @@ metadata:
 data:
   nginx.conf: |
     events {}
+
     http {
       client_max_body_size 20M;
+
       server {
         listen 80;
         server_name _;
@@ -24,7 +26,7 @@ data:
         # Host Agent API
         location /api/ {
           rewrite ^/api/?(.*)$ /$1 break;
-          proxy_pass http://host-agent:8000;
+          proxy_pass http://host-agent:8000/;
           proxy_set_header Host $host;
           proxy_set_header X-Real-IP $remote_addr;
           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -32,9 +34,9 @@ data:
         }
 
         # Vector DB Service (for backoffice)
-        location /vector_db_service/ {
-          rewrite ^/vector_db_service/?(.*)$ /$1 break;
-          proxy_pass http://vector-db-service:8004/;
+        location /vector-db/ {
+          rewrite ^/vector-db/?(.*)$ /$1 break;
+          proxy_pass http://vector-db-service:8004;
           proxy_set_header Host $host;
           proxy_set_header X-Real-IP $remote_addr;
           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -51,10 +53,10 @@ data:
           proxy_set_header X-Forwarded-Proto $scheme;
         }
 
-        # Repository Service (for db endpoints)
+        # Repository Service
         location /repository/ {
           rewrite ^/repository/?(.*)$ /$1 break;
-          proxy_pass http://repository-service:8007;
+          proxy_pass http://repository-service:8007/;
           proxy_set_header Host $host;
           proxy_set_header X-Real-IP $remote_addr;
           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -64,7 +66,7 @@ data:
         # FAQ Agent
         location /faq-agent/ {
           rewrite ^/faq-agent/?(.*)$ /$1 break;
-          proxy_pass http://faq-agent:8001;
+          proxy_pass http://faq-agent:8001/;
           proxy_set_header Host $host;
           proxy_set_header X-Real-IP $remote_addr;
           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -74,7 +76,7 @@ data:
         # Summary Agent
         location /summary-agent/ {
           rewrite ^/summary-agent/?(.*)$ /$1 break;
-          proxy_pass http://summary-agent:8003;
+          proxy_pass http://summary-agent:8003/;
           proxy_set_header Host $host;
           proxy_set_header X-Real-IP $remote_addr;
           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
