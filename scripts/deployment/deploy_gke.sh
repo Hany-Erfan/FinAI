@@ -38,6 +38,15 @@ else
 fi
 
 # ----------------------------
+# --- Required secrets/env validation ---
+# ----------------------------
+: "${GOOGLE_API_KEY:?GOOGLE_API_KEY is required}"
+: "${ORCHESTRATOR_GOOGLE_API_KEY:?ORCHESTRATOR_GOOGLE_API_KEY is required}"
+: "${SERVICES_GOOGLE_API_KEY:?SERVICES_GOOGLE_API_KEY is required}"
+: "${GUARDRAILS_API_KEY:?GUARDRAILS_API_KEY is required}"
+: "${GUARDRAILS_LLM_MODEL:?GUARDRAILS_LLM_MODEL is required}"
+
+# ----------------------------
 # --- Cluster Configuration ---
 # ----------------------------
 # These can be overridden via .env or environment variables
@@ -202,7 +211,25 @@ for service in $SERVICES; do
   IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/${service}:latest"
 
   echo "Building $service..."
-  docker build --platform linux/amd64 -t "$IMAGE" -f "$DOCKERFILE" "$BUILD_CONTEXT"
+
+  if [ "$service" = "guardrails-service" ]; then
+    : "${GUARDRAILS_API_KEY:?GUARDRAILS_API_KEY is required for guardrails-service build}"
+    : "${GUARDRAILS_LLM_MODEL:?GUARDRAILS_LLM_MODEL is required for guardrails-service build}"
+
+    docker build \
+      --platform linux/amd64 \
+      --build-arg GUARDRAILS_API_KEY="$GUARDRAILS_API_KEY" \
+      --build-arg GUARDRAILS_LLM_MODEL="$GUARDRAILS_LLM_MODEL" \
+      -t "$IMAGE" \
+      -f "$DOCKERFILE" \
+      "$BUILD_CONTEXT"
+  else
+    docker build \
+      --platform linux/amd64 \
+      -t "$IMAGE" \
+      -f "$DOCKERFILE" \
+      "$BUILD_CONTEXT"
+  fi
 
   echo "Pushing $service..."
   docker push "$IMAGE"
@@ -210,6 +237,12 @@ for service in $SERVICES; do
   echo "Deploying $service..."
   # Replace IMAGE_PLACEHOLDER with actual image and apply
   sed "s|IMAGE_PLACEHOLDER|$IMAGE|g" "$K8S_DIR/${service}.yaml" | kubectl apply -n $NAMESPACE -f -
+
+  if [ "$service" = "guardrails-service" ]; then
+    kubectl set resources deployment/guardrails-service -n $NAMESPACE \
+      --requests=cpu=500m,memory=1Gi,ephemeral-storage=1Gi \
+      --limits=cpu=1,memory=2Gi,ephemeral-storage=1Gi
+  fi
 done
 
 # ----------------------------

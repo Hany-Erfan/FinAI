@@ -32,9 +32,19 @@ data:
         }
 
         # Vector DB Service (for backoffice)
-        location /vector-db/ {
-          rewrite ^/vector-db/?(.*)$ /$1 break;
-          proxy_pass http://vector-db-service:8004;
+        location /vector_db_service/ {
+          rewrite ^/vector_db_service/?(.*)$ /$1 break;
+          proxy_pass http://vector-db-service:8004/;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # Guardrails Service
+        location /guardrails_service/ {
+          rewrite ^/guardrails_service/?(.*)$ /$1 break;
+          proxy_pass http://guardrails-service:8005/;
           proxy_set_header Host $host;
           proxy_set_header X-Real-IP $remote_addr;
           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

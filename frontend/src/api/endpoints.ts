@@ -17,4 +17,3 @@ export const Endpoints = {
   GUARDRAILS_CONFIG: `${GUARDRAILS_BASE}/config`,
   GET_MESSAGES: (session_id: string) => `${REPOSITORY_BASE}/sessions/${session_id}/messages`,
 } as const;
-
