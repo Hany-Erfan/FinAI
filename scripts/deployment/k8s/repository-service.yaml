@@ -1,34 +1,32 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: frontend
+  name: repository-service
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: frontend
+      app: repository-service
   template:
     metadata:
       labels:
-        app: frontend
+        app: repository-service
     spec:
       nodeSelector:
         cloud.google.com/gke-spot: "true"
       containers:
-        - name: frontend
+        - name: repository-service
           image: IMAGE_PLACEHOLDER
           ports:
-            - containerPort: 5173
+            - containerPort: 8007
           envFrom:
             - configMapRef:
                 name: app-env
+            - secretRef:
+                name: api-keys
           env:
-            - name: VITE_API_URL
-              value: /api
-            - name: VITE_VECTOR_DB_URL
-              value: /vector-db/vector_db_service
-            - name: VITE_REPOSITORY_URL
-              value: /repository
+            - name: PYTHONUNBUFFERED
+              value: "1"
           resources:
             requests:
               cpu: 100m
@@ -40,12 +38,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: frontend
+  name: repository-service
 spec:
   type: ClusterIP
   selector:
-    app: frontend
+    app: repository-service
   ports:
-    - port: 80
-      targetPort: 5173
+    - port: 8007
+      targetPort: 8007
       protocol: TCP

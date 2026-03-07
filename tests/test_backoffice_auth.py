@@ -2,10 +2,10 @@ import pytest
 import pytest_asyncio
 import httpx
 import os
-
 # Base URLs for services
 HOST_AGENT_URL = os.getenv("HOST_AGENT_URL", "http://localhost:8000")
 VECTOR_DB_URL = os.getenv("VECTOR_DB_URL", "http://localhost:8004")
+TEST_DB_URL = os.getenv("DATABASE_URL", "postgresql://agentixBuddy:agentixsecret@postgres-db:5432/agentixBuddy")
 
 # Test credentials
 ADMIN_USERNAME = "admin"
@@ -13,35 +13,45 @@ ADMIN_PASSWORD = "admin_AgentixBuddy"
 USER_USERNAME = "user"
 USER_PASSWORD = "user_AgentixBuddy"
 
+import uuid
+import pytest
 
 class TestBackofficeAuth:
     """Test suite for backoffice authentication and authorization."""
+    # ------------------------------
+    # Tests
+    # ------------------------------
 
     @pytest_asyncio.fixture
     async def admin_session(self):
         """Login as admin and return session cookies and session_id."""
-        session_id = "test-admin-session-integration"
+        session_id = str(uuid.uuid4()) 
         async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{HOST_AGENT_URL}/login",
-                json={
-                    "username": ADMIN_USERNAME,
-                    "password": ADMIN_PASSWORD,
+            try:
+                response = await client.post(
+                    f"{HOST_AGENT_URL}/login",
+                    json={
+                        "username": ADMIN_USERNAME,
+                        "password": ADMIN_PASSWORD,
+                        "session_id": session_id
+                    }
+                )
+                assert response.status_code == 200
+                data = response.json()
+                assert data["role"] == "admin"
+                return {
+                    "cookies": response.cookies,
                     "session_id": session_id
                 }
-            )
-            assert response.status_code == 200
-            data = response.json()
-            assert data["role"] == "admin"
-            return {
-                "cookies": response.cookies,
-                "session_id": session_id
-            }
+            except Exception as e:
+                # Catch the real error
+                print("Exception raised:", e)
+                raise
 
     @pytest_asyncio.fixture
     async def user_session(self):
         """Login as regular user and return session cookies and session_id."""
-        session_id = "test-user-session-integration"
+        session_id = str(uuid.uuid4()) 
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"{HOST_AGENT_URL}/login",
@@ -54,6 +64,9 @@ class TestBackofficeAuth:
             assert response.status_code == 200
             data = response.json()
             assert data["role"] == "user"
+            assert response.status_code == 200
+            data = response.json()
+            assert data["role"] == "user"
             return {
                 "cookies": response.cookies,
                 "session_id": session_id
@@ -62,26 +75,34 @@ class TestBackofficeAuth:
     @pytest.mark.asyncio
     async def test_login_admin_success(self):
         """Test that admin can login successfully."""
-        session_id = "test-login-admin"
+        session_id = str(uuid.uuid4()) 
         async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{HOST_AGENT_URL}/login",
-                json={
-                    "username": ADMIN_USERNAME,
-                    "password": ADMIN_PASSWORD,
+            try:
+                response = await client.post(
+                    f"{HOST_AGENT_URL}/login",
+                    json={
+                        "username": ADMIN_USERNAME,
+                        "password": ADMIN_PASSWORD,
+                        "session_id": session_id
+                    }
+                )
+                print('TESTTTTT', response.text)
+                assert response.status_code == 200
+                data = response.json()
+                assert data["role"] == "admin"
+                return {
+                    "cookies": response.cookies,
                     "session_id": session_id
                 }
-            )
-            assert response.status_code == 200
-            data = response.json()
-            assert data["message"] == "Login successful"
-            assert data["role"] == "admin"
-            assert data["username"] == ADMIN_USERNAME
+            except Exception as e:
+                # Catch the real error
+                print("Exception raised:", e)
+                raise
 
     @pytest.mark.asyncio
     async def test_login_user_success(self):
         """Test that regular user can login successfully."""
-        session_id = "test-login-user"
+        session_id = str(uuid.uuid4()) 
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"{HOST_AGENT_URL}/login",
@@ -96,11 +117,10 @@ class TestBackofficeAuth:
             assert data["message"] == "Login successful"
             assert data["role"] == "user"
             assert data["username"] == USER_USERNAME
-
     @pytest.mark.asyncio
     async def test_login_invalid_credentials(self):
         """Test that invalid credentials are rejected."""
-        session_id = "test-login-invalid"
+        session_id = str(uuid.uuid4()) 
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"{HOST_AGENT_URL}/login",

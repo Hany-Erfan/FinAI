@@ -14,6 +14,10 @@ spec:
     spec:
       nodeSelector:
         cloud.google.com/gke-spot: "true"
+      initContainers:
+          - name: wait-for-postgres
+            image: postgres:16
+            command: ["sh", "-c", "until pg_isready -h postgres-db -p 5432 -U postgres; do sleep 2; done"]
       containers:
         - name: host-agent
           image: IMAGE_PLACEHOLDER
@@ -29,6 +33,8 @@ spec:
               value: "1"
             - name: FAQ_AGENT_URL
               value: http://faq-agent:8001
+            - name: SUMMARY_AGENT_URL
+              value: http://summary-agent:8003
             - name: GUARDRAILS_URL
               value: http://guardrails-service:8005
           resources:

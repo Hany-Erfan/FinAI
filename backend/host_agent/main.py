@@ -7,6 +7,10 @@ import secrets
 import traceback
 from typing import Optional
 import httpx
+from backend.common.masking_pii import DataMasker
+from backend.postgres_db.database import get_db, init_db
+from backend.postgres_db.models import MessageRole
+from backend.postgres_db.repository import SessionRepository
 import uvicorn
 from fastapi import FastAPI, HTTPException, Depends, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,7 +22,7 @@ from google.adk.events import Event, EventActions
 from google.adk.memory import InMemoryMemoryService
 from google.genai import types
 
-from backend.bank_server.utils.security_deps import auth_cookie_name, csrf_cookie_name, get_current_user, refresh_session_cookies, require_admin, verify_csrf
+from backend.bank_server.utils.security_deps import auth_cookie_name, csrf_cookie_name, get_current_user, refresh_session_cookies, verify_csrf
 from backend.bank_server.utils.user_store import get_user_by_username
 from backend.common.pass_auth import verify_password
 import backend.host_agent.routing_agent as routing_agent_module
@@ -213,6 +217,9 @@ async def get_response_from_agent(message: str, user_id: str, session_id: str) -
         traceback.print_exc()
         return f"An error occurred while processing your request: {str(e)}"
 
+def get_chat_respository(db = Depends(get_db)) -> SessionRepository:
+    return SessionRepository(db = db, masker= DataMasker())
+
 def detect_language(text: str) -> str:
     # Lightweight script-based detection (Arabic vs default English)
     # Arabic Unicode blocks: \u0600-\u06FF, \u0750-\u077F, \u08A0-\u08FF
@@ -222,12 +229,19 @@ def detect_language(text: str) -> str:
             return "ar"
     return "en"
 
+def build_transcript(messages) -> str:
+    lines = []
+    for m in messages:
+        role_label = m.role.value.upper()
+        lines.append(f"[{role_label}]: {m.content}")
+    return "\n".join(lines)
+
 # =========================
 # API Endpoints
 # =========================
 
 @app.post("/login", response_model=LoginResponse, tags=["login"])
-def login(payload: LoginRequest, response: Response) -> LoginResponse:
+def login(payload: LoginRequest, response: Response, repo = Depends(get_chat_respository)) -> LoginResponse:
     if not payload.session_id.strip():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Session id required")
 
@@ -246,6 +260,14 @@ def login(payload: LoginRequest, response: Response) -> LoginResponse:
 
     csrf_token = secrets.token_urlsafe(32)
     refresh_session_cookies(response, user, payload.session_id, csrf_token)
+
+    # init session
+    repo.create_session(
+            user_id=user["user_id"],
+            user_name=payload.username,
+            session_id=payload.session_id,
+        )
+
     return LoginResponse(
         message="Login successful",
         role=user["role"],
@@ -263,55 +285,82 @@ def getCurrentUser(current_user=Depends(get_current_user)) -> User:
         full_name=current_user["full_name"],
 )
 
+
 @app.post("/logout", tags=["Logout"])
 def logout(
     request: Request,
     response: Response,
     current_user=Depends(get_current_user),
     _: None = Depends(verify_csrf),
+    repo = Depends(get_chat_respository)
 ) -> dict:
     del current_user, _
     session_id = request.headers.get("X-Session-Id")
-    if not session_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing session id")
+
     response.delete_cookie(key=auth_cookie_name(session_id), path="/")
-    response.delete_cookie(key=csrf_cookie_name(session_id), path="/")
+    response.delete_cookie(key=csrf_cookie_name(session_id), path="/")   
+    #end session
+    repo.end_session(session_id)
     return {"message": "Logged out"}
 
 
-@app.get("/admin/management", tags=["Admin"])
-def admin_panel(current_user=Depends(require_admin)) -> dict:
-    return {
-        "message": "Welcome to admin management",
-        "user_id": current_user.get("user_id"),
-        "username": current_user["username"],
-        "role": current_user["role"],
-}
-
+@app.post("/summary",  tags=["Summary"])
+async def record_summary(request: Request, 
+                         current_user=Depends(get_current_user),
+                         repo = Depends(get_chat_respository)):
+    session_id = request.headers.get("X-Session-Id")
+    messages = repo.get_messages(session_id)
+    if not messages:
+        logger.error("Session has no messages to summarise.")
+        return {"status": "no messages to summarise"}
+    else:
+        if not session_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing session id")
+        transcript = build_transcript(messages)
+        safe_transcript = repo.masker.mask(transcript)
+        await get_response_from_agent(
+        f'summarize the following {session_id}:{safe_transcript}', user_id=current_user["user_id"], session_id=session_id
+        )
+        return {"status": "summary recorded"}
 
 @app.post("/chat", response_model=ChatResponse, tags=["Chat"])
 async def chat_endpoint(
     request: ChatRequest,
     current_user=Depends(get_current_user),
     _: None = Depends(verify_csrf),
+    repo = Depends(get_chat_respository)
 ):
     try:        
 
         lang = detect_language(request.message or "")
+        session_id = request.session_id
 
-        # 1) Guardrails input
+        # 1) Mask user's message before DB storage 
+        masked_user_message = repo.masker.mask(request.message)
+        repo.save_message(
+            session_id=session_id,
+            role=MessageRole.USER,
+            content=masked_user_message,
+        )
+
+        # 2) Guardrails input
         is_safe_input = await check_guardrails_input(request.message)
         if not is_safe_input:
-            return ChatResponse(
-                response=(
+            response=(
                     ".أسف ، لا أستطيع تنفيذ طلبك بسبب سياسات الاستخدام"
                     if lang == "ar"
                     else "I'm sorry, I cannot process your request due to policy restrictions."
-                ),
-                status="completed",
+                )
+            repo.save_message(
+                session_id=session_id,
+                role=MessageRole.MODEL,
+                        content=response,
             )
 
-        session_id = request.session_id
+            return ChatResponse(
+                response=response,
+                status="completed",
+            )
 
         # 3) Create/update ADK session state
         session = await SESSION_SERVICE.get_session(
@@ -355,7 +404,7 @@ async def chat_endpoint(
         # If the agent responded in Arabic, prefer that for downstream messages
         lang = detect_language(response_text or request.message or "")
 
-        # 5) Guardrails output
+        # 6) Guardrails output
         is_safe_output, filtered = await check_guardrails_output(response_text)
         final_response = (
             filtered if (is_safe_output and filtered is not None) else (
@@ -363,6 +412,14 @@ async def chat_endpoint(
                 if lang == "ar"
                 else "Response blocked by policy rules."
             )
+        )
+
+        # 6) Mask model reply before DB storage
+        masked_reply = repo.masker.mask(final_response)
+        repo.save_message(
+            session_id=session_id,
+            role=MessageRole.MODEL,
+            content=masked_reply,
         )
 
         return ChatResponse(
@@ -395,6 +452,9 @@ async def startup_event():
         session_id=DEFAULT_SESSION_ID,
     )
 
+    logger.info("Initializing Database...")
+    init_db()
+    
     logger.info("Initializing Runner...")
     ROUTING_AGENT_RUNNER = Runner(
         agent=routing_agent_module.root_agent,  # initialized by init_routing_agent()

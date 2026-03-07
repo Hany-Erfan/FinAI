@@ -20,3 +20,20 @@ export async function sendChatMessage(message, sessionId) {
 
   return response.json();
 }
+
+export async function getMessages(sessionId) {
+  const response = await fetch(`${Endpoints.GET_MESSAGES(sessionId)}`, {
+    method: "GET",
+    headers: {
+      ...sessionHeaders(sessionId),
+      ...csrfHeaders(sessionId),
+    },
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: "Chat error" }));
+    throw new Error(err.detail || "Chat error");
+  }
+  return response.json();
+}

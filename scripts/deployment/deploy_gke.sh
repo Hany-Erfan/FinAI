@@ -146,9 +146,25 @@ else
 fi
 
 # ----------------------------
+# --- Deploy Postgres DB ---
+# ----------------------------
+if [ "${SKIP_DB}" != "1" ]; then
+  echo "Deploying Postgres..."
+  kubectl apply -n $NAMESPACE -f "$K8S_DIR/postgres/postgres-secrets.yaml"
+  kubectl apply -n $NAMESPACE -f "$K8S_DIR/postgres/postgres-pvc.yaml"
+  kubectl apply -n $NAMESPACE -f "$K8S_DIR/postgres/postgres-service.yaml"
+  kubectl apply -n $NAMESPACE -f "$K8S_DIR/postgres/postgres.yaml"
+
+  echo "Waiting for Postgres to be ready..."
+  kubectl rollout status deployment/postgres-db -n $NAMESPACE --timeout=300s
+else
+  echo "Skipping database deployment (SKIP_DB=1)"
+fi
+
+# ----------------------------
 # --- Build and Deploy Services ---
 # ----------------------------
-SERVICES="frontend host-agent faq-agent vector-db-service guardrails-service"
+SERVICES="frontend host-agent faq-agent summary-agent vector-db-service guardrails-service repository-service"
 
 for service in $SERVICES; do
   # Define per-service variables
@@ -165,12 +181,20 @@ for service in $SERVICES; do
       DOCKERFILE="backend/agents/faq_agent/Dockerfile"
       BUILD_CONTEXT="."
       ;;
+    "summary-agent")
+      DOCKERFILE="backend/agents/summary_agent/Dockerfile"
+      BUILD_CONTEXT="."
+      ;;
     "vector-db-service")
       DOCKERFILE="backend/services/vector_db_service/Dockerfile"
       BUILD_CONTEXT="."
       ;;
     "guardrails-service")
       DOCKERFILE="backend/services/guardrails/Dockerfile"
+      BUILD_CONTEXT="."
+      ;;
+    "repository-service")
+      DOCKERFILE="backend/services/repository_service/Dockerfile"
       BUILD_CONTEXT="."
       ;;
   esac

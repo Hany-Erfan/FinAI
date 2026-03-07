@@ -40,3 +40,4 @@ class ThreadSafeDict(dict):
 
 RetailAgentCache: ThreadSafeDict = ThreadSafeDict()
 FAQAgentCache: ThreadSafeDict = ThreadSafeDict()
+SummaryAgentCache: ThreadSafeDict = ThreadSafeDict()

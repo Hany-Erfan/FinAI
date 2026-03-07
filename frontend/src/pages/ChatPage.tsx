@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { sendChatMessage } from '../api/chat';
+import { getMessages, sendChatMessage } from '../api/chat';
 import { useNavigate } from 'react-router-dom';
 
 interface Message {
@@ -38,7 +38,7 @@ const AgentIcon = () => (
 const ChatPage = ({ auth, onLogout, sessionId }) => {
   const navigate = useNavigate();
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(sessionId);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -50,8 +50,33 @@ const ChatPage = ({ auth, onLogout, sessionId }) => {
   };
 
   useEffect(() => {
-    scrollToBottom();
+    scrollToBottom(); 
   }, [sessions, activeSessionId, isLoading]);
+
+  // Fetch messages from DB whenever active session changes
+  useEffect(() => {
+    if (!sessionId) return;
+
+      async function loadMessages() {
+        try {
+          const data: Message[] = await getMessages(sessionId);
+          
+          setSessions(prev => {
+            const exists = prev.find(s => s.id === sessionId);
+            if (exists) {
+              // update existing session messages
+              return prev.map(s => s.id === sessionId ? { ...s, messages: data } : s);
+            }
+            // session doesn't exist yet, create it
+            return [{ id: sessionId, title: "", messages: data }, ...prev];
+          });
+        } catch (err) {
+          console.error("Failed to load messages:", err);
+        }
+      }
+
+    loadMessages();
+  }, []);
 
   const getActiveSession = () => sessions.find(s => s.id === activeSessionId);
 
@@ -65,7 +90,6 @@ const ChatPage = ({ auth, onLogout, sessionId }) => {
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
-
     const userMessage: Message = {
       text: input,
       sender: 'user',

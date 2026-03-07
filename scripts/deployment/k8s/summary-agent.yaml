@@ -1,34 +1,34 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: frontend
+  name: summary-agent
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: frontend
+      app: summary-agent
   template:
     metadata:
       labels:
-        app: frontend
+        app: summary-agent
     spec:
       nodeSelector:
         cloud.google.com/gke-spot: "true"
       containers:
-        - name: frontend
+        - name: summary-agent
           image: IMAGE_PLACEHOLDER
           ports:
-            - containerPort: 5173
+            - containerPort: 8003
           envFrom:
             - configMapRef:
                 name: app-env
+            - secretRef:
+                name: api-keys
           env:
-            - name: VITE_API_URL
-              value: /api
-            - name: VITE_VECTOR_DB_URL
-              value: /vector-db/vector_db_service
-            - name: VITE_REPOSITORY_URL
-              value: /repository
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: REPO_URL
+              value: http://repository-service:8007
           resources:
             requests:
               cpu: 100m
@@ -40,12 +40,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: frontend
+  name: summary-agent
 spec:
   type: ClusterIP
   selector:
-    app: frontend
+    app: summary-agent
   ports:
-    - port: 80
-      targetPort: 5173
+    - port: 8003
+      targetPort: 8003
       protocol: TCP
