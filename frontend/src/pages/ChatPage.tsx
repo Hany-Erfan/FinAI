@@ -96,7 +96,6 @@ const ChatPage = ({ auth, onLogout, sessionId }) => {
       timestamp: new Date().toISOString(),
     };
     let currentSessionId = activeSessionId;
-    console.log('handle send ', currentSessionId)
     let updatedSessions = [...sessions];
     if (!currentSessionId) {
       // Create a new session

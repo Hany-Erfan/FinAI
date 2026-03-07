@@ -1,28 +1,24 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: host-agent
+  name: summary-agent
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: host-agent
+      app: summary-agent
   template:
     metadata:
       labels:
-        app: host-agent
+        app: summary-agent
     spec:
       nodeSelector:
         cloud.google.com/gke-spot: "true"
-      initContainers:
-          - name: wait-for-postgres
-            image: postgres:16
-            command: ["sh", "-c", "until pg_isready -h postgres-db -p 5432 -U postgres; do sleep 2; done"]
       containers:
-        - name: host-agent
+        - name: summary-agent
           image: IMAGE_PLACEHOLDER
           ports:
-            - containerPort: 8000
+            - containerPort: 8003
           envFrom:
             - configMapRef:
                 name: app-env
@@ -31,12 +27,8 @@ spec:
           env:
             - name: PYTHONUNBUFFERED
               value: "1"
-            - name: FAQ_AGENT_URL
-              value: http://faq-agent:8001
-            - name: SUMMARY_AGENT_URL
-              value: http://summary-agent:8003
-            - name: GUARDRAILS_URL
-              value: http://guardrails-service:8005
+            - name: REPO_URL
+              value: http://repository-service:8007
           resources:
             requests:
               cpu: 100m
@@ -48,12 +40,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: host-agent
+  name: summary-agent
 spec:
   type: ClusterIP
   selector:
-    app: host-agent
+    app: summary-agent
   ports:
-    - port: 8000
-      targetPort: 8000
+    - port: 8003
+      targetPort: 8003
       protocol: TCP
