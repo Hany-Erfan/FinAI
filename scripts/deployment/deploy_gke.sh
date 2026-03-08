@@ -137,7 +137,7 @@ else
   kubectl delete job --all -n $NAMESPACE --ignore-not-found
   kubectl delete pod --all -n $NAMESPACE --ignore-not-found
   kubectl delete service --all -n $NAMESPACE --ignore-not-found
-  kubectl delete pvc --all -n $NAMESPACE --ignore-not-found
+  # kubectl delete pvc --all -n $NAMESPACE --ignore-not-found
 fi
 
 # ----------------------------
