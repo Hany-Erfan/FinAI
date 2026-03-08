@@ -3,7 +3,7 @@ import os
 
 SECRET_KEY = os.getenv("SECRET_KEY", "replace-this-in-production-with-a-long-random-secret")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 6
+ACCESS_TOKEN_EXPIRE_MINUTES = 8
 TOKEN_EXPIRE_DELTA = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 AUTH_COOKIE_PREFIX = "chat_auth_token"
 AUTH_COOKIE_HTTPONLY = True

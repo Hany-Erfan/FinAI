@@ -1,4 +1,4 @@
-.PHONY: help up down restart logs status build rebuild deploy-cluster deploy-services deploy-apps deploy-status deploy-logs deploy-cost-estimate teardown-cluster deploy-frontend deploy-host-agent deploy-faq-agent deploy-vector-db deploy-guardrails
+.PHONY: help up down restart logs status build rebuild deploy-cluster deploy-services deploy-apps deploy-status deploy-logs deploy-cost-estimate teardown-cluster deploy-frontend deploy-host-agent deploy-faq-agent deploy-summary-agent deploy-vector-db deploy-guardrails deploy-repository
 
 # Load environment variables (POSIX-safe)
 ifneq (,$(wildcard .env))
@@ -102,7 +102,7 @@ deploy-cost-estimate: ## Show estimated GKE costs and resource breakdown
 	@echo "Estimated Monthly Cost: Visit https://cloud.google.com/products/calculator"
 	@echo "Autopilot charges: ~\$$0.0445/vCPU-hour, ~\$$0.00491/GB-hour"
 
-deploy-apps: deploy-frontend deploy-host-agent deploy-faq-agent deploy-vector-db deploy-guardrails ## Rebuild and deploy all app services (keeps databases)
+deploy-apps: deploy-frontend deploy-host-agent deploy-faq-agent deploy-summary-agent deploy-vector-db deploy-guardrails deploy-repository ## Rebuild and deploy all app services (keeps databases)
 
 # ============================================
 # Individual Service Deployments (for updates)
@@ -129,6 +129,13 @@ deploy-faq-agent: ## Rebuild and deploy faq-agent only
 	kubectl delete pod -l app=faq-agent -n $(K8S_NAMESPACE)
 	kubectl rollout status deployment/faq-agent -n $(K8S_NAMESPACE) --timeout=120s
 
+deploy-summary-agent: ## Rebuild and deploy summary-agent only
+	@echo "Building and pushing summary-agent..."
+	docker build --no-cache --platform linux/amd64 -t $(GCP_REGION)-docker.pkg.dev/$(GCP_PROJECT_ID)/$(GCP_REPO)/summary-agent:latest -f backend/agents/summary_agent/Dockerfile .
+	docker push $(GCP_REGION)-docker.pkg.dev/$(GCP_PROJECT_ID)/$(GCP_REPO)/summary-agent:latest
+	kubectl delete pod -l app=summary-agent -n $(K8S_NAMESPACE)
+	kubectl rollout status deployment/summary-agent -n $(K8S_NAMESPACE) --timeout=120s
+
 deploy-vector-db: ## Rebuild and deploy vector-db-service only
 	@echo "Building and pushing vector-db-service..."
 	docker build --no-cache --platform linux/amd64 -t $(GCP_REGION)-docker.pkg.dev/$(GCP_PROJECT_ID)/$(GCP_REPO)/vector-db-service:latest -f backend/services/vector_db_service/Dockerfile .
@@ -142,3 +149,11 @@ deploy-guardrails: ## Rebuild and deploy guardrails-service only
 	docker push $(GCP_REGION)-docker.pkg.dev/$(GCP_PROJECT_ID)/$(GCP_REPO)/guardrails-service:latest
 	kubectl delete pod -l app=guardrails-service -n $(K8S_NAMESPACE)
 	kubectl rollout status deployment/guardrails-service -n $(K8S_NAMESPACE) --timeout=120s
+
+
+deploy-repository: ## Rebuild and deploy repository-service only
+	@echo "Building and pushing repository-service..."
+	docker build --no-cache --platform linux/amd64 -t $(GCP_REGION)-docker.pkg.dev/$(GCP_PROJECT_ID)/$(GCP_REPO)/repository-service:latest -f backend/services/repository_service/Dockerfile .
+	docker push $(GCP_REGION)-docker.pkg.dev/$(GCP_PROJECT_ID)/$(GCP_REPO)/repository-service:latest
+	kubectl delete pod -l app=repository-service -n $(K8S_NAMESPACE)
+	kubectl rollout status deployment/repository-service -n $(K8S_NAMESPACE) --timeout=120s
