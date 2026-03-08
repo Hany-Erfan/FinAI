@@ -152,7 +152,8 @@ export default function App() {
           path="/chat"
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated}>
-              <ChatPage auth={auth} onLogout={handleLogout} sessionId={sessionId} />
+              <ChatPage auth={auth} onLogout={handleLogout} sessionId={sessionId} 
+              inactivityTimeout={INACTIVITY_TIMEOUT_MS} />
             </ProtectedRoute>
           }
         />

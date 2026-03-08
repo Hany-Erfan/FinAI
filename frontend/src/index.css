@@ -2143,3 +2143,57 @@ button:disabled {
   gap: 8px;
   padding-top: 8px;
 }
+
+  .session-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: 0.78rem;
+    color: #6b7280;
+  }
+  .session-btn:hover { border-color: #9ca3af; }
+
+  .session-popover {
+    display: none;
+    position: absolute;
+    top: calc(100% + 8px);  /* instead of bottom */
+    bottom: unset;    
+    left: 50%;
+    transform: translateX(-50%);
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 12px 14px;
+    width: 180px; 
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    font-size: 0.8rem;
+    color: #374151;
+    line-height: 1.5;
+    z-index: 11;
+  }
+  .session-popover.open { display: block; }
+
+  .session-popover-arrow {
+    top: -5px;         
+    bottom: unset;
+    border-left: 1px solid #e5e7eb;   
+    border-top: 1px solid #e5e7eb;    
+    border-right: none;
+    border-bottom: none;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 9px;
+    height: 9px;
+    background: #fff;
+  }
+
+  .session-wrapper {
+    position: relative;
+    display: inline-block;
+  }
