@@ -27,6 +27,7 @@ interface GuardrailsConfig {
     secrets_present_output: boolean;
     is_safe_output: boolean;
     valid_topics: string[];
+    invalid_topics: string[];
 }
 
 interface BackofficeProps {
@@ -64,6 +65,7 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
     const [config, setConfig] = useState<GuardrailsConfig | null>(null);
     const [savingConfig, setSavingConfig] = useState(false);
     const [newTopic, setNewTopic] = useState('');
+    const [newInvalidTopic, setNewInvalidTopic] = useState('');
     const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
 
     const navigate = useNavigate();
@@ -228,6 +230,25 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
         });
     };
 
+    const handleAddInvalidTopic = () => {
+        if (!config || !newInvalidTopic.trim()) return;
+        if (!config.invalid_topics.includes(newInvalidTopic.trim())) {
+            setConfig({
+                ...config,
+                invalid_topics: [...config.invalid_topics, newInvalidTopic.trim()]
+            });
+        }
+        setNewInvalidTopic('');
+    };
+
+    const handleRemoveInvalidTopic = (topic: string) => {
+        if (!config) return;
+        setConfig({
+            ...config,
+            invalid_topics: config.invalid_topics.filter((t: string) => t !== topic)
+        });
+    };
+
     const handleSelectAllValidators = () => {
         if (!config) return;
         const newConfig = { ...config };
@@ -250,6 +271,13 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
         if (!config) return;
         if (window.confirm("Are you sure you want to remove all valid topics?")) {
             setConfig({ ...config, valid_topics: [] });
+        }
+    };
+
+    const handleRemoveAllInvalidTopics = () => {
+        if (!config) return;
+        if (window.confirm("Are you sure you want to remove all invalid topics?")) {
+            setConfig({ ...config, invalid_topics: [] });
         }
     };
 
@@ -333,7 +361,7 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
                                 gap: '1.25rem'
                             }}>
                                 {Object.entries(config)
-                                    .filter(([key]) => key !== 'valid_topics')
+                                    .filter(([key]) => key !== 'valid_topics' && key !== 'invalid_topics')
                                     .map(([key, value]) => (
                                         <div key={key} className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, position: 'relative' }}>
                                             <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '36px', height: '18px', flexShrink: 0 }}>
@@ -448,6 +476,58 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
                                     onKeyPress={(e: React.KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && handleAddTopic()}
                                 />
                                 <button onClick={handleAddTopic} className="btn btn-secondary" style={{ whiteSpace: 'nowrap' }}>Add Topic</button>
+                            </div>
+                        </section>
+
+                        <section className="section-card" style={{ marginTop: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                <h3 style={{ margin: 0 }}>Invalid Topics / Escalation Triggers</h3>
+                                {config.invalid_topics && config.invalid_topics.length > 0 && (
+                                    <button
+                                        type="button"
+                                        className="btn btn-danger"
+                                        style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
+                                        onClick={handleRemoveAllInvalidTopics}
+                                    >
+                                        Remove All Invalid Topics
+                                    </button>
+                                )}
+                            </div>
+                            <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: '1rem' }}>These topics are strictly forbidden. Mentioning them will trigger an immediate escalation to a supervisor.</p>
+
+                            <div style={{
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                gap: '0.5rem',
+                                marginBottom: '1.5rem',
+                                minHeight: '44px',
+                                background: '#fff0f0',
+                                padding: '0.75rem',
+                                borderRadius: '8px',
+                                border: '1px solid #ffcdd2'
+                            }}>
+                                {!config.invalid_topics || config.invalid_topics.length === 0 ? (
+                                    <span style={{ color: '#999', fontSize: '0.8rem', fontStyle: 'italic' }}>No invalid topics configured.</span>
+                                ) : (
+                                    config.invalid_topics.map((topic: string) => (
+                                        <span key={topic} style={{ background: '#ffebee', color: '#c62828', padding: '0.3rem 0.75rem', borderRadius: '16px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem', border: '1px solid #ffcdd2' }}>
+                                            {topic}
+                                            <button onClick={() => handleRemoveInvalidTopic(topic)} style={{ background: 'none', border: 'none', color: '#b71c1c', cursor: 'pointer', outline: 'none', padding: 0, fontSize: '1.1rem', lineHeight: 1, fontWeight: 'bold' }}>&times;</button>
+                                        </span>
+                                    ))
+                                )}
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '0.5rem', maxWidth: '450px' }}>
+                                <input
+                                    type="text"
+                                    className="form-control"
+                                    value={newInvalidTopic}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewInvalidTopic(e.target.value)}
+                                    placeholder="Enter forbidden topic (e.g. Gambling)"
+                                    onKeyPress={(e: React.KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && handleAddInvalidTopic()}
+                                />
+                                <button onClick={handleAddInvalidTopic} className="btn btn-danger" style={{ whiteSpace: 'nowrap' }}>Add Topic</button>
                             </div>
                         </section>
 

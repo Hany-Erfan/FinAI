@@ -111,7 +111,7 @@ class User(BaseModel):
 # Helpers
 # =========================
 
-async def check_guardrails_input(message: str) -> bool:
+async def check_guardrails_input(message: str) -> tuple[bool, str | None]:
     """Check user input against Guardrails service."""
     try:
         timeout = httpx.Timeout(30.0, connect=5.0)  # allow LLM-based validators time to finish
@@ -123,19 +123,20 @@ async def check_guardrails_input(message: str) -> bool:
             if response.status_code == 200:
                 data = response.json()
                 if not data.get("is_safe", True):
-                    logger.warning(f"[GUARDRAILS] Input blocked: {data.get('reason')}")
-                    return False
-                return True
+                    reason = data.get("reason")
+                    logger.warning(f"[GUARDRAILS] Input blocked: {reason}")
+                    return False, reason
+                return True, None
 
             logger.error(f"[ERROR] Guardrails input check non-200: {response.status_code} body={response.text!r}")
-            return False  # fail closed
+            return False, "Validation service unavailable."  # fail closed
 
     except Exception as e:
         logger.error(f"[ERROR] Guardrails input check failed: {type(e).__name__}: {e!r}")
-        return False  # fail closed
+        return False, "Validation service error."  # fail closed
 
 
-async def check_guardrails_output(message: str) -> tuple[bool, str | None]:
+async def check_guardrails_output(message: str) -> tuple[bool, str | None, str | None]:
     """Check agent output against Guardrails service."""
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
@@ -147,14 +148,15 @@ async def check_guardrails_output(message: str) -> tuple[bool, str | None]:
                 data = response.json()
                 is_safe = data.get("is_safe", True)
                 filtered = data.get("filtered_message")
+                reason = data.get("reason")
                 if not is_safe:
                     logger.warning(
-                        f"[GUARDRAILS] Output blocked/filtered: {data.get('reason')}"
+                        f"[GUARDRAILS] Output blocked/filtered: {reason}"
                     )
-                return is_safe, filtered
+                return is_safe, filtered, reason
     except Exception as e:
         logger.error(f"[ERROR] Guardrails output check failed: {e}")
-    return True, message
+    return True, message, None
 
 
 def log_tool_calls_and_responses(event) -> None:
@@ -344,9 +346,9 @@ async def chat_endpoint(
         )
 
         # 2) Guardrails input
-        is_safe_input = await check_guardrails_input(request.message)
+        is_safe_input, input_reason = await check_guardrails_input(request.message)
         if not is_safe_input:
-            response=(
+            response = input_reason if input_reason else (
                     ".أسف ، لا أستطيع تنفيذ طلبك بسبب سياسات الاستخدام"
                     if lang == "ar"
                     else "I'm sorry, I cannot process your request due to policy restrictions."
@@ -405,12 +407,14 @@ async def chat_endpoint(
         lang = detect_language(response_text or request.message or "")
 
         # 6) Guardrails output
-        is_safe_output, filtered = await check_guardrails_output(response_text)
+        is_safe_output, filtered, out_reason = await check_guardrails_output(response_text)
         final_response = (
             filtered if (is_safe_output and filtered is not None) else (
-                "تم حظر الاستجابة بواسطة قواعد السياسة."
-                if lang == "ar"
-                else "Response blocked by policy rules."
+                out_reason if out_reason else (
+                    "تم حظر الاستجابة بواسطة قواعد السياسة."
+                    if lang == "ar"
+                    else "Response blocked by policy rules."
+                )
             )
         )
 
