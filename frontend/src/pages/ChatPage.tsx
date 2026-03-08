@@ -37,7 +37,8 @@ const AgentIcon = () => (
   </svg>
 );
 
-const ChatPage = ({ auth, onLogout, sessionId }) => {
+const ChatPage = ({ auth, onLogout, sessionId, inactivityTimeout }) => {
+  const INACTIVITY_MINUTES = inactivityTimeout / 1000 / 60;
   const navigate = useNavigate();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(sessionId);
@@ -54,6 +55,18 @@ const ChatPage = ({ auth, onLogout, sessionId }) => {
   useEffect(() => {
     scrollToBottom(); 
   }, [sessions, activeSessionId, isLoading]);
+
+  useEffect(() => {
+    function handleOutsideClick(e: MouseEvent) {
+      const btn = document.getElementById('session-btn');
+      const popover = document.getElementById('session-popover');
+      if (btn && popover && !btn.contains(e.target as Node) && !popover.contains(e.target as Node)) {
+        popover.classList.remove('open');
+      }
+    }
+    document.addEventListener('click', handleOutsideClick);
+    return () => document.removeEventListener('click', handleOutsideClick);
+  }, []);
 
   // Fetch messages from DB whenever active session changes
   useEffect(() => {
@@ -79,6 +92,7 @@ const ChatPage = ({ auth, onLogout, sessionId }) => {
 
     loadMessages();
   }, []);
+
 
   const getActiveSession = () => sessions.find(s => s.id === activeSessionId);
 
@@ -202,6 +216,29 @@ const ChatPage = ({ auth, onLogout, sessionId }) => {
           <div className="header-placeholder"></div>
           <h2>AgentixBuddy</h2>
           <div className="header-placeholder"></div>
+           <div className="session-wrapper">
+                <button
+                  id="session-btn"
+                  className="session-btn"
+                  onClick={() => document.getElementById('session-popover')?.classList.toggle('open')}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg> Session security
+                </button>
+                <div id="session-popover" className="session-popover">
+                  <div className="session-popover-arrow" />
+                  <strong style={{ color: "#111827", display: "block", marginBottom: "4px" }}>
+                    ⚠️ Auto logout enabled
+                    </strong>
+                    For your security, your session will automatically expire after{" "}
+                    <strong>{INACTIVITY_MINUTES} minutes</strong> of inactivity.
+                    Any unsaved progress will be lost.
+                </div>
+              </div>
         </div>
         <div className="chat-body">
           <div className="chat-messages">

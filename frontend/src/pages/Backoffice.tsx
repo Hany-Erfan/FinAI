@@ -163,7 +163,7 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
     };
 
     const handleDelete = async (productId: string) => {
-        if (!window.confirm(`Are you sure you want to delete this product?`)) return;
+        if (!window.confirm(`Are you sure you want to delete this product?\n\n Note: Any changes will take effect for users upon their next login. Currently active sessions will not be affected until the user logs out.`)) return;
         try {
             const res = await axios.delete(Endpoints.BACKOFFICE_DELETE(productId), axiosConfig);
             if (res.data.success) {
@@ -178,7 +178,7 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
     };
 
     const handleDeleteAll = async () => {
-        if (!window.confirm("ARE YOU SURE? This will permanently delete ALL products from the database.")) return;
+        if (!window.confirm(`ARE YOU SURE? This will permanently delete ALL products from the database.\n\n Note: Any changes will take effect for users upon their next login. Currently active sessions will not be affected until the user logs out.`)) return;
         setLoading(true);
         try {
             const res = await axios.delete(Endpoints.BACKOFFICE_CLEAR, axiosConfig);
@@ -524,6 +524,18 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
                             <div className="form-group">
                                 <label>Arabic Answer</label>
                                 <textarea rows={3} className="form-control rtl" value={currentProduct.answer_ar} onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setCurrentProduct({ ...currentProduct, answer_ar: e.target.value })} />
+                            </div>
+                            <div>
+                            <div className="change-disclaimer-popup">
+                                <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                                <line x1="12" y1="9" x2="12" y2="13"/>
+                                <line x1="12" y1="17" x2="12.01" y2="17"/>
+                                </svg></span>
+                                <span>These changes will take effect for users upon their next login. 
+                                     Any currently active sessions will not be affected until the user logs out.</span>
+                            </div>
                             </div>
                             <div className="modal-footer">
                                 <button type="button" onClick={() => setShowModal(false)} className="btn btn-secondary">Cancel</button>

@@ -8,7 +8,10 @@ import { getCurrentUser, login } from './api/login';
 import { logout, summary } from './api/logout';
 
 const TAB_SESSION_KEY = "chat_tab_session_id";
-const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000;
+// ⚠️ INACTIVITY_TIMEOUT_MS must always be less than the server-side session TTL.
+// If you change this value, update the backend session expiry accordingly. 
+// Add a 1 minute buffer in the backend (auth_config.py) for the summary to be executed
+const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
 
 // Fallback for crypto.randomUUID (not available on HTTP non-localhost)
 function generateUUID(): string {
@@ -43,6 +46,10 @@ export default function App() {
   const [checking, setChecking] = useState(true);
   const [sessionId, setSessionId] = useState(() => getOrCreateTabSessionId());
   const inactivityTimerRef = useRef(null);
+  const sessionIdRef = useRef(sessionId);
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+    }, [sessionId]); 
 
   useEffect(() => {
     async function validate() {
@@ -74,15 +81,21 @@ export default function App() {
   };
 
   const handleLogout = useCallback(async () => {
-    try {
-      await summary(sessionId);
-      logout(sessionId);
-    } catch(err) {
-      console.error('err on logout', err);
-    }
-    setAuth(null);
-    setSessionId(createNewTabSessionId())
-  }, [sessionId]);
+  try {
+    await summary(sessionIdRef.current);  
+    logout(sessionIdRef.current);   
+  } catch(err) {
+    console.error('err on logout', err);
+  } finally {
+    setAuth(null);                       
+    setSessionId(createNewTabSessionId());
+  }
+  }, []);
+
+  const handleLogoutRef = useRef(handleLogout);
+  useEffect(() => {
+    handleLogoutRef.current = handleLogout;
+  }, [handleLogout]); 
 
   useEffect(() => {
     if (!auth?.username) {
@@ -102,26 +115,18 @@ export default function App() {
       }, INACTIVITY_TIMEOUT_MS);
     }
 
-    function onActivity() {
-      scheduleLogout();
-    }
-
     const events = ["mousemove", "mousedown", "keydown", "touchstart", "scroll"];
-    events.forEach((eventName) => {
-      window.addEventListener(eventName, onActivity, { passive: true });
-    });
+    events.forEach((e) => window.addEventListener(e, scheduleLogout, { passive: true }));
     scheduleLogout();
 
     return () => {
-      events.forEach((eventName) => {
-        window.removeEventListener(eventName, onActivity);
-      });
-      if (inactivityTimerRef.current) {
-        clearTimeout(inactivityTimerRef.current);
-        inactivityTimerRef.current = null;
-      }
-    };
-  }, [auth?.username, handleLogout]);
+        events.forEach((e) => window.removeEventListener(e, scheduleLogout));
+        if (inactivityTimerRef.current) {
+          clearTimeout(inactivityTimerRef.current);
+          inactivityTimerRef.current = null;
+        }
+      };
+    }, [auth?.username]);
 
   if (checking) {
     return <div className="page">Checking session...</div>;
@@ -147,7 +152,8 @@ export default function App() {
           path="/chat"
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated}>
-              <ChatPage auth={auth} onLogout={handleLogout} sessionId={sessionId} />
+              <ChatPage auth={auth} onLogout={handleLogout} sessionId={sessionId} 
+              inactivityTimeout={INACTIVITY_TIMEOUT_MS} />
             </ProtectedRoute>
           }
         />
