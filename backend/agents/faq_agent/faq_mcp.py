@@ -53,9 +53,9 @@ async def get_vector_db_response(endpoint: str, params: dict[str, Any] | None = 
 @mcp.tool()
 async def retrieve_product_info(user_query:str) -> str:
     """Retrieves product related information based on user query.
-    
+
     :param user_query: The user query to retrieve product information for.
-    
+
     :return: The product information based on the user query.
     """
     endpoint = '/vector_db_service/retreive_product'

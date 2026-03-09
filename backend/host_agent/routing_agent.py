@@ -182,7 +182,7 @@ class RoutingAgent:
         :rtype: Agent
         """
         return Agent(
-            model=os.getenv("HOST_AGENT_MODEL_ID", "gemini-3-flash-preview"),
+            model=os.getenv("HOST_AGENT_MODEL_ID", "gemini-3.1-flash-lite-preview"),
             name="Routing_agent",
             instruction=self.root_instruction,
             before_model_callback=self.before_model_callback,
@@ -548,17 +548,17 @@ class RoutingAgent:
         with tracer.start_as_current_span("routing_agent.send_message") as span:
             ctx = span.get_span_context()
             logger.debug(f"DEBUG: routing_agent.send_message current_trace_id={ctx.trace_id}")
-            
+
             # Add routing attributes
             span.set_attribute("agent.id", "routing-agent")
             span.set_attribute("agent.name", "Routing_agent")
             span.set_attribute("routing.target_agent", agent_name)
             span.set_attribute("routing.task", task[:500])  # Truncate long tasks
-            
+
             state = tool_context.state
             session_id = state.get("session_id", "unknown")
             span.set_attribute("session.id", session_id)
-            
+
             # Track active agent and switching
             previous_agent = state.get("active_agent")
             if previous_agent:
@@ -571,16 +571,16 @@ class RoutingAgent:
                             "to_agent": agent_name,
                         }
                     )
-            
+
             span.add_event(
                 "routing.delegation_start",
                 attributes={"delegated_to": agent_name}
             )
-            
+
             try:
                 # Add routing attributes
                 span.set_attribute("routing.available_agents", ",".join(self.remote_agent_connections.keys()))
-                
+
                 if agent_name not in self.remote_agent_connections:
                     error_msg = f"Agent {agent_name} not found"
                     span.set_attribute("error", True)
@@ -591,7 +591,7 @@ class RoutingAgent:
                 self._handle_agent_switching(state, agent_name)
                 state["active_agent"] = agent_name
                 client = self.remote_agent_connections[agent_name]
-                
+
                 # Add agent URL to span
                 span.set_attribute("routing.agent_url", client.agent_url)
 
@@ -600,11 +600,11 @@ class RoutingAgent:
                     span.set_attribute("error", True)
                     span.add_event("routing.error", attributes={"error.message": error_msg})
                     raise ValueError(error_msg)
-                    
+
                 task_id = self._get_task_id(state)
                 context_id = self._get_or_create_context_id(state)
                 message_id = self._extract_message_metadata(state)
-                
+
                 span.set_attribute("routing.context_id", context_id)
                 if task_id:
                     span.set_attribute("routing.task_id", task_id)
@@ -629,9 +629,9 @@ class RoutingAgent:
                 message_request = SendMessageRequest(
                     id=message_id, params=MessageSendParams.model_validate(payload)
                 )
-                
+
                 span.add_event("routing.send_to_agent", attributes={"target": agent_name})
-                
+
                 send_response: SendMessageResponse = await client.send_message(
                     message_request=message_request
                 )
@@ -652,7 +652,7 @@ class RoutingAgent:
 
                 task_result = send_response.root.result
                 logger.debug(f"DEBUG: Task result: {task_result}")
-                
+
                 # Track task result
                 span.set_attribute("routing.task_state", task_result.status.state)
                 span.add_event(
@@ -662,11 +662,11 @@ class RoutingAgent:
                         "task.id": task_result.id if task_result.id else "none",
                     }
                 )
-                
+
                 result = self._handle_task_result(task_result, state, agent_name)
                 span.set_attribute("routing.result", str(result)[:500])
                 return result
-                
+
             except Exception as e:
                 span.record_exception(e)
                 span.set_attribute("error", True)
