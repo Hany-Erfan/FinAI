@@ -16,4 +16,6 @@ export const Endpoints = {
   SUMMARY: `${API_BASE}/summary`,
   // GUARDRAILS_CONFIG: `${GUARDRAILS_BASE}/config`,
   GET_MESSAGES: (session_id: string) => `${REPOSITORY_BASE}/sessions/${session_id}/messages`,
+  ADMIN_SESSIONS: `${API_BASE}/admin/sessions`,
+  ADMIN_SESSION_DETAIL: (id: string) => `${API_BASE}/admin/sessions/${id}`,
 } as const;

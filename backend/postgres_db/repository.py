@@ -61,6 +61,9 @@ class SessionRepository:
     def get_session(self, session_id: uuid.UUID) -> Optional[Session]:
         return self.db.get(Session, session_id)
 
+    def list_sessions(self) -> list[Session]:
+        return self.db.query(Session).order_by(Session.created_at.desc()).all()
+
     # ------------------------------------------------------------------
     # Message CRUD
     # ------------------------------------------------------------------

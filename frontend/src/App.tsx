@@ -4,6 +4,7 @@ import LoginForm from './pages/LoginForm';
 import ProtectedRoute from './pages/ProtectedRoute';
 import ChatPage from './pages/ChatPage';
 import Backoffice from './pages/Backoffice';
+import SessionExplorer from './pages/SessionExplorer';
 import { getCurrentUser, login } from './api/login';
 import { logout, summary } from './api/logout';
 
@@ -162,6 +163,14 @@ export default function App() {
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated} requiredRole="admin" userRole={auth?.role}>
               <Backoffice sessionId={sessionId} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/session-explorer"
+          element={
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredRole="admin" userRole={auth?.role}>
+              <SessionExplorer sessionId={sessionId} />
             </ProtectedRoute>
           }
         />

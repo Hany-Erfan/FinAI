@@ -196,6 +196,7 @@ const ChatPage = ({ auth, onLogout, sessionId, inactivityTimeout }) => {
         {auth.role === "admin" ? (
           <div className="admin-box">
             <button onClick={() => navigate('/backoffice')}>Manage FAQs</button>
+            <button onClick={() => navigate('/session-explorer')}>Session Explorer</button>
           </div>
         ) : null}
         {/* Sidebar Login/Logout */}

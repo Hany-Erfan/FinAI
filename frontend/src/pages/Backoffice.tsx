@@ -314,6 +314,7 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
                 <h1>Document Backoffice</h1>
                 <div style={{ display: 'flex', gap: '1rem' }}>
                     <button onClick={() => openModal()} className="btn btn-success">+ Add New</button>
+                    <button onClick={() => navigate('/session-explorer')} className="btn btn-primary">Session Explorer</button>
                     <button onClick={() => navigate('/chat')} className="btn btn-secondary">Back to Chat</button>
                 </div>
             </header>
