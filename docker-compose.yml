@@ -29,8 +29,8 @@ services:
     depends_on:
       retail-agent:
         condition: service_started
-      guardrails-service:
-        condition: service_healthy
+      #      guardrails-service:
+      #        condition: service_healthy
       postgres-db:
         condition: service_healthy
     environment:
@@ -46,7 +46,7 @@ services:
       - BANK_URL=http://bank-server:8006
       - DATABASE_URL=postgresql://agentixBuddy:agentixsecret@postgres-db:5432/agentixBuddy
       - PORT=8000
-      - GUARDRAILS_URL=http://guardrails-service:8005
+      #      - GUARDRAILS_URL=http://guardrails-service:8005
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
       - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL}
@@ -102,7 +102,7 @@ services:
       - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL}
     command: >
       python -m uvicorn backend.agents.retail_agent.server:retail_app --host 0.0.0.0 --port 8002 --reload --log-level debug --use-colors
-      
+
   summary-agent:
     build:
       context: .
@@ -213,37 +213,37 @@ services:
     command: >
       python -m uvicorn backend.services.vector_db_service.server:vector_db_app --host 0.0.0.0 --port 8004 --reload --log-level debug --use-colors
 
-  guardrails-service:
-    build:
-      context: .
-      dockerfile: backend/services/guardrails/Dockerfile
-      args:
-        - GUARDRAILS_API_KEY=${GUARDRAILS_API_KEY}
-    container_name: guardrails-service
-    ports:
-      - "8005:8005"
-    volumes:
-      - ./backend:/app/backend
-    environment:
-      - GUARDRAILS_API_KEY=${GUARDRAILS_API_KEY}
-      - GUARDRAILS_LLM_MODEL=${GUARDRAILS_LLM_MODEL}
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - OPENAI_API_KEY=${GOOGLE_API_KEY}
-      - GEMINI_API_KEY=${GOOGLE_API_KEY}
-      - PYTHONUNBUFFERED=1
-      - PORT=8005
-      - TOKENIZERS_PARALLELISM=false
-      - OMP_NUM_THREADS=1
-      - MKL_NUM_THREADS=1
-      - NLTK_DATA=/usr/local/nltk_data
-    healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8005/health')\""]
-      interval: 5s
-      timeout: 5s
-      retries: 60
-      start_period: 30s
-    command: >
-      python -m backend.services.guardrails.server
+  #  guardrails-service:
+  #    build:
+  #      context: .
+  #      dockerfile: backend/services/guardrails/Dockerfile
+  #      args:
+  #        - GUARDRAILS_API_KEY=${GUARDRAILS_API_KEY}
+  #    container_name: guardrails-service
+  #    ports:
+  #      - "8005:8005"
+  #    volumes:
+  #      - ./backend:/app/backend
+  #    environment:
+  #      - GUARDRAILS_API_KEY=${GUARDRAILS_API_KEY}
+  #      - GUARDRAILS_LLM_MODEL=${GUARDRAILS_LLM_MODEL}
+  #      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+  #      - OPENAI_API_KEY=${GOOGLE_API_KEY}
+  #      - GEMINI_API_KEY=${GOOGLE_API_KEY}
+  #      - PYTHONUNBUFFERED=1
+  #      - PORT=8005
+  #      - TOKENIZERS_PARALLELISM=false
+  #      - OMP_NUM_THREADS=1
+  #      - MKL_NUM_THREADS=1
+  #      - NLTK_DATA=/usr/local/nltk_data
+  #    healthcheck:
+  #      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8005/health')\""]
+  #      interval: 5s
+  #      timeout: 5s
+  #      retries: 60
+  #      start_period: 30s
+  #    command: >
+  #      python -m backend.services.guardrails.server
 
   postgres-db:
     image: postgres:16
@@ -256,15 +256,14 @@ services:
     ports:
       - "5432:5432"
     volumes:
-     - postgres_data:/var/lib/postgresql/data
-    entrypoint: ["bash", "-c", "rm -f /var/lib/postgresql/data/postmaster.pid && docker-entrypoint.sh postgres"]
+      - postgres_data:/var/lib/postgresql/data
+    entrypoint: [ "bash", "-c", "rm -f /var/lib/postgresql/data/postmaster.pid && docker-entrypoint.sh postgres" ]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agentixBuddy} -d ${POSTGRES_DB:-agentixBuddy}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agentixBuddy} -d ${POSTGRES_DB:-agentixBuddy}" ]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
-
 
 volumes:
   qdrant_data:

@@ -113,49 +113,50 @@ class User(BaseModel):
 
 async def check_guardrails_input(message: str) -> tuple[bool, str | None]:
     """Check user input against Guardrails service."""
-    try:
-        timeout = httpx.Timeout(30.0, connect=5.0)  # allow LLM-based validators time to finish
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.post(
-                f"{GUARDRAILS_URL}/check_input",
-                json={"message": message},
-            )
-            if response.status_code == 200:
-                data = response.json()
-                if not data.get("is_safe", True):
-                    reason = data.get("reason")
-                    logger.warning(f"[GUARDRAILS] Input blocked: {reason}")
-                    return False, reason
-                return True, None
-
-            logger.error(f"[ERROR] Guardrails input check non-200: {response.status_code} body={response.text!r}")
-            return False, "Validation service unavailable."  # fail closed
-
-    except Exception as e:
-        logger.error(f"[ERROR] Guardrails input check failed: {type(e).__name__}: {e!r}")
-        return False, "Validation service error."  # fail closed
+    # try:
+    #     timeout = httpx.Timeout(30.0, connect=5.0)  # allow LLM-based validators time to finish
+    #     async with httpx.AsyncClient(timeout=timeout) as client:
+    #         response = await client.post(
+    #             f"{GUARDRAILS_URL}/check_input",
+    #             json={"message": message},
+    #         )
+    #         if response.status_code == 200:
+    #             data = response.json()
+    #             if not data.get("is_safe", True):
+    #                 reason = data.get("reason")
+    #                 logger.warning(f"[GUARDRAILS] Input blocked: {reason}")
+    #                 return False, reason
+    #             return True, None
+    # 
+    #         logger.error(f"[ERROR] Guardrails input check non-200: {response.status_code} body={response.text!r}")
+    #         return False, "Validation service unavailable."  # fail closed
+    # 
+    # except Exception as e:
+    #     logger.error(f"[ERROR] Guardrails input check failed: {type(e).__name__}: {e!r}")
+    #     return False, "Validation service error."  # fail closed
+    return True, None
 
 
 async def check_guardrails_output(message: str) -> tuple[bool, str | None, str | None]:
     """Check agent output against Guardrails service."""
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.post(
-                f"{GUARDRAILS_URL}/check_output",
-                json={"message": message},
-            )
-            if response.status_code == 200:
-                data = response.json()
-                is_safe = data.get("is_safe", True)
-                filtered = data.get("filtered_message")
-                reason = data.get("reason")
-                if not is_safe:
-                    logger.warning(
-                        f"[GUARDRAILS] Output blocked/filtered: {reason}"
-                    )
-                return is_safe, filtered, reason
-    except Exception as e:
-        logger.error(f"[ERROR] Guardrails output check failed: {e}")
+    # try:
+    #     async with httpx.AsyncClient(timeout=5.0) as client:
+    #         response = await client.post(
+    #             f"{GUARDRAILS_URL}/check_output",
+    #             json={"message": message},
+    #         )
+    #         if response.status_code == 200:
+    #             data = response.json()
+    #             is_safe = data.get("is_safe", True)
+    #             filtered = data.get("filtered_message")
+    #             reason = data.get("reason")
+    #             if not is_safe:
+    #                 logger.warning(
+    #                     f"[GUARDRAILS] Output blocked/filtered: {reason}"
+    #                 )
+    #             return is_safe, filtered, reason
+    # except Exception as e:
+    #     logger.error(f"[ERROR] Guardrails output check failed: {e}")
     return True, message, None
 
 

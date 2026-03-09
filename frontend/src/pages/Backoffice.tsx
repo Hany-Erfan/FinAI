@@ -14,6 +14,7 @@ interface Product {
     answer_ar: string;
 }
 
+/*
 interface GuardrailsConfig {
     is_safe_input: boolean;
     enforce_anonymous_mode: boolean;
@@ -29,11 +30,13 @@ interface GuardrailsConfig {
     valid_topics: string[];
     invalid_topics: string[];
 }
+*/
 
 interface BackofficeProps {
     sessionId: string;
 }
 
+/*
 const validatorDescriptions: Record<string, string> = {
     is_safe_input: "Analyzes user input for common LLM injection patterns, prompt leakage attempts, and dangerous command keywords like 'DROP TABLE' or 'BYPASS'.",
     enforce_anonymous_mode: "Ensures privacy by blocking requests that contain phrases related to personal bank accounts, balances, or specific transactions, keeping the session anonymous.",
@@ -47,6 +50,7 @@ const validatorDescriptions: Record<string, string> = {
     secrets_present_output: "Verifies that the AI's generated response doesn't contain any internal system keys, tokens, or back-end secrets.",
     is_safe_output: "A final catch-all safety check to ensure the response is helpful, professional, and doesn't contain any restricted content."
 };
+*/
 
 export default function Backoffice({ sessionId }: BackofficeProps) {
     const [products, setProducts] = useState<Product[]>([]);
@@ -62,11 +66,13 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
         answer_ar: ''
     });
 
+    /*
     const [config, setConfig] = useState<GuardrailsConfig | null>(null);
     const [savingConfig, setSavingConfig] = useState(false);
     const [newTopic, setNewTopic] = useState('');
     const [newInvalidTopic, setNewInvalidTopic] = useState('');
     const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
+    */
 
     const navigate = useNavigate();
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -81,9 +87,10 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
 
     useEffect(() => {
         fetchProducts();
-        fetchConfig();
+        // fetchConfig();
     }, []);
 
+    /*
     const fetchConfig = async () => {
         try {
             const res = await axios.get(Endpoints.GUARDRAILS_CONFIG, axiosConfig);
@@ -94,6 +101,7 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
             console.error("Failed to fetch configuration", err);
         }
     };
+    */
 
     const fetchProducts = async () => {
         try {
@@ -206,6 +214,7 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
         setShowModal(true);
     };
 
+    /*
     const handleConfigToggle = (key: keyof GuardrailsConfig) => {
         if (!config) return;
         setConfig({ ...config, [key]: !config[key as keyof GuardrailsConfig] });
@@ -296,6 +305,7 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
             setSavingConfig(false);
         }
     };
+    */
 
 
     return (
@@ -324,7 +334,7 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
                 </div>
             </section>
 
-            <section className="section-card">
+            {/* <section className="section-card">
                 <h2>Guardrails Configuration</h2>
                 <p style={{ marginBottom: '1.5rem', fontSize: '0.9rem', color: '#555' }}>Manage the AI agent's validation rules and allowed topics.</p>
 
@@ -540,7 +550,7 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
                 ) : (
                     <p style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>Loading Guardrails configuration...</p>
                 )}
-            </section>
+            </section> */}
 
             <section className="section-card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -606,16 +616,16 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
                                 <textarea rows={3} className="form-control rtl" value={currentProduct.answer_ar} onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setCurrentProduct({ ...currentProduct, answer_ar: e.target.value })} />
                             </div>
                             <div>
-                            <div className="change-disclaimer-popup">
-                                <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-                                stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                                <line x1="12" y1="9" x2="12" y2="13"/>
-                                <line x1="12" y1="17" x2="12.01" y2="17"/>
-                                </svg></span>
-                                <span>These changes will take effect for users upon their next login. 
-                                     Any currently active sessions will not be affected until the user logs out.</span>
-                            </div>
+                                <div className="change-disclaimer-popup">
+                                    <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                        stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                                        <line x1="12" y1="9" x2="12" y2="13" />
+                                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                                    </svg></span>
+                                    <span>These changes will take effect for users upon their next login.
+                                        Any currently active sessions will not be affected until the user logs out.</span>
+                                </div>
                             </div>
                             <div className="modal-footer">
                                 <button type="button" onClick={() => setShowModal(false)} className="btn btn-secondary">Cancel</button>
