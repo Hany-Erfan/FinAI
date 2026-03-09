@@ -102,7 +102,8 @@ deploy-cost-estimate: ## Show estimated GKE costs and resource breakdown
 	@echo "Estimated Monthly Cost: Visit https://cloud.google.com/products/calculator"
 	@echo "Autopilot charges: ~\$$0.0445/vCPU-hour, ~\$$0.00491/GB-hour"
 
-deploy-apps: deploy-frontend deploy-host-agent deploy-faq-agent deploy-summary-agent deploy-vector-db deploy-guardrails deploy-repository ## Rebuild and deploy all app services (keeps databases)
+# deploy-apps: deploy-frontend deploy-host-agent deploy-faq-agent deploy-summary-agent deploy-vector-db deploy-guardrails deploy-repository ## Rebuild and deploy all app services (keeps databases)
+deploy-apps: deploy-frontend deploy-host-agent deploy-faq-agent deploy-summary-agent deploy-vector-db deploy-repository ## Rebuild and deploy all app services (keeps databases)
 
 # ============================================
 # Individual Service Deployments (for updates)
@@ -143,12 +144,12 @@ deploy-vector-db: ## Rebuild and deploy vector-db-service only
 	kubectl delete pod -l app=vector-db-service -n $(K8S_NAMESPACE)
 	kubectl rollout status deployment/vector-db-service -n $(K8S_NAMESPACE) --timeout=120s
 
-deploy-guardrails: ## Rebuild and deploy guardrails-service only
-	@echo "Building and pushing guardrails-service..."
-	docker build --no-cache --platform linux/amd64 -t $(GCP_REGION)-docker.pkg.dev/$(GCP_PROJECT_ID)/$(GCP_REPO)/guardrails-service:latest -f backend/services/guardrails/Dockerfile .
-	docker push $(GCP_REGION)-docker.pkg.dev/$(GCP_PROJECT_ID)/$(GCP_REPO)/guardrails-service:latest
-	kubectl delete pod -l app=guardrails-service -n $(K8S_NAMESPACE)
-	kubectl rollout status deployment/guardrails-service -n $(K8S_NAMESPACE) --timeout=120s
+# deploy-guardrails: ## Rebuild and deploy guardrails-service only
+# 	@echo "Building and pushing guardrails-service..."
+# 	docker build --no-cache --platform linux/amd64 -t $(GCP_REGION)-docker.pkg.dev/$(GCP_PROJECT_ID)/$(GCP_REPO)/guardrails-service:latest -f backend/services/guardrails/Dockerfile .
+# 	docker push $(GCP_REGION)-docker.pkg.dev/$(GCP_PROJECT_ID)/$(GCP_REPO)/guardrails-service:latest
+# 	kubectl delete pod -l app=guardrails-service -n $(K8S_NAMESPACE)
+# 	kubectl rollout status deployment/guardrails-service -n $(K8S_NAMESPACE) --timeout=120s
 
 
 deploy-repository: ## Rebuild and deploy repository-service only

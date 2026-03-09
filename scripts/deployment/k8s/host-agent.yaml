@@ -35,8 +35,8 @@ spec:
               value: http://faq-agent:8001
             - name: SUMMARY_AGENT_URL
               value: http://summary-agent:8003
-            - name: GUARDRAILS_URL
-              value: http://guardrails-service:8005
+            # - name: GUARDRAILS_URL
+            #   value: http://guardrails-service:8005
           resources:
             requests:
               cpu: 100m
