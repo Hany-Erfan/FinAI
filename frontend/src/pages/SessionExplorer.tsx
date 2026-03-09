@@ -225,9 +225,6 @@ export default function SessionExplorer({ sessionId }: SessionExplorerProps) {
                                 Resolution: <strong>{detail.summary.resolution_status}</strong>
                             </span>
                             <span>Generated: {formatDate(detail.summary.generated_at)}</span>
-                            {detail.summary.model_used && (
-                                <span>Model: {detail.summary.model_used}</span>
-                            )}
                         </div>
                     </div>
                 )}
