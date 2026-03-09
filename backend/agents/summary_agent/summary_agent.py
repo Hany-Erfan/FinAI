@@ -1,9 +1,6 @@
 import os
+from backend.agents.summary_agent.summary_mcp import record_summary
 from google.adk.agents import LlmAgent
-from google.adk.tools.mcp_tool.mcp_toolset import (
-    MCPToolset,
-    StdioServerParameters,
-)
 from backend.common.agent import Agent
 from backend.common.cache_dict import SummaryAgentCache
 
@@ -32,15 +29,8 @@ def create_summary_agent(user_id: str, session_id: str) -> LlmAgent:
                 Afterwards, the output should be saved in the database using the save_summaries.
                 Do not output any other text. Call the tool and stop.
                 """,
-        tools=[
-            MCPToolset(
-                connection_params=StdioServerParameters(
-                    command='python',
-                    args=['backend/agents/summary_agent/summary_mcp.py'],
-                    env=dict(os.environ),
-                ),
-            )
-        ],
+                
+        tools=[record_summary],
     )
 
 
