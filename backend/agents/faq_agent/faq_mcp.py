@@ -58,7 +58,7 @@ async def retrieve_product_info(user_query:str) -> str:
 
     :return: The product information based on the user query.
     """
-    endpoint = '/vector_db_service/retreive_product'
+    endpoint = 'vector_db_service/retreive_product'
     data = await get_vector_db_response(endpoint, params={'user_query': user_query})
 
     if data is None:

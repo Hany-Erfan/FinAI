@@ -15,6 +15,7 @@ services:
       - host-agent
     environment:
       - VITE_API_URL=http://localhost:8000
+      - VITE_GRAFANA_URL=http://localhost:3000
     command: [ "npm", "run", "dev", "--", "--host", "0.0.0.0" ]
 
   host-agent:
@@ -50,6 +51,12 @@ services:
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
       - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=lgtm:4317
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_TRACES_ENABLED=true
+      - OTEL_SERVICE_NAME=host-agent
+      - LOG_LOKI_ENDPOINT=lgtm:4317
+      - LOG_SERVICE_NAME=host-agent
     command: >
       uvicorn backend.host_agent.main:app --host 0.0.0.0 --port 8000 --reload --log-level debug
 
@@ -74,6 +81,12 @@ services:
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
       - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=lgtm:4317
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_TRACES_ENABLED=true
+      - OTEL_SERVICE_NAME=faq-agent
+      - LOG_LOKI_ENDPOINT=lgtm:4317
+      - LOG_SERVICE_NAME=faq-agent
     command: >
       python -m uvicorn backend.agents.faq_agent.server:faq_app --host 0.0.0.0 --port 8001 --reload --log-level debug --use-colors
 
@@ -100,6 +113,12 @@ services:
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
       - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=lgtm:4317
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_TRACES_ENABLED=true
+      - OTEL_SERVICE_NAME=retail-agent
+      - LOG_LOKI_ENDPOINT=lgtm:4317
+      - LOG_SERVICE_NAME=retail-agent
     command: >
       python -m uvicorn backend.agents.retail_agent.server:retail_app --host 0.0.0.0 --port 8002 --reload --log-level debug --use-colors
 
@@ -148,10 +167,15 @@ services:
       - PYTHONUNBUFFERED=1
       - UVICORN_LOG_LEVEL=debug
       - LOG_LEVEL=debug
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production-min-32-chars
       - JWT_EXPIRE_MINUTES=480
       - PORT=8006
+      - OTEL_EXPORTER_OTLP_ENDPOINT=lgtm:4317
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_TRACES_ENABLED=true
+      - OTEL_SERVICE_NAME=bank-server
+      - LOG_LOKI_ENDPOINT=lgtm:4317
+      - LOG_SERVICE_NAME=bank-server
     command: >
       python -m uvicorn backend.bank_server.server:bank_app --host 0.0.0.0 --port 8006 --reload --log-level debug --use-colors
 
@@ -210,6 +234,12 @@ services:
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
       - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=lgtm:4317
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_TRACES_ENABLED=true
+      - OTEL_SERVICE_NAME=vector-db-service
+      - LOG_LOKI_ENDPOINT=lgtm:4317
+      - LOG_SERVICE_NAME=vector-db-service
     command: >
       python -m uvicorn backend.services.vector_db_service.server:vector_db_app --host 0.0.0.0 --port 8004 --reload --log-level debug --use-colors
 
@@ -236,6 +266,12 @@ services:
   #      - OMP_NUM_THREADS=1
   #      - MKL_NUM_THREADS=1
   #      - NLTK_DATA=/usr/local/nltk_data
+  #      - OTEL_EXPORTER_OTLP_ENDPOINT=lgtm:4317
+  #      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+  #      - OTEL_TRACES_ENABLED=true
+  #      - OTEL_SERVICE_NAME=guardrails-service
+  #      - LOG_LOKI_ENDPOINT=lgtm:4317
+  #      - LOG_SERVICE_NAME=guardrails-service
   #    healthcheck:
   #      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8005/health')\""]
   #      interval: 5s
@@ -244,6 +280,20 @@ services:
   #      start_period: 30s
   #    command: >
   #      python -m backend.services.guardrails.server
+
+  lgtm:
+    image: grafana/otel-lgtm:0.11.9
+    container_name: lgtm
+    ports:
+      - "3000:3000"
+      - "4318:4318"
+      - "4317:4317"
+    healthcheck:
+      test: [ "CMD-SHELL", "test -f /tmp/ready || exit 1" ]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 10s
 
   postgres-db:
     image: postgres:16

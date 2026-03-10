@@ -155,6 +155,19 @@ else
 fi
 
 # ----------------------------
+# --- Deploy LGTM (Grafana + Loki + Tempo) ---
+# ----------------------------
+if [ "${SKIP_DB}" != "1" ]; then
+  echo "Deploying LGTM observability stack..."
+  sed "s|STATIC_IP_PLACEHOLDER|$INGRESS_STATIC_IP|g" "$K8S_DIR/lgtm.yaml" | kubectl apply -n $NAMESPACE -f -
+
+  echo "Waiting for LGTM to be ready..."
+  kubectl rollout status statefulset/lgtm -n $NAMESPACE --timeout=300s
+else
+  echo "Skipping LGTM deployment (SKIP_DB=1)"
+fi
+
+# ----------------------------  
 # --- Deploy Postgres DB ---
 # ----------------------------
 if [ "${SKIP_DB}" != "1" ]; then
@@ -258,4 +271,25 @@ echo ""
 echo "--------------------------------------------------------"
 echo "Deployment Complete!"
 echo "Application accessible at: http://$INGRESS_STATIC_IP"
+echo "Grafana dashboard at: http://$INGRESS_STATIC_IP/grafana/"
 echo "--------------------------------------------------------"
+
+# ----------------------------
+# --- Upload Grafana Dashboard ---
+# ----------------------------
+echo "Uploading POC dashboard to Grafana..."
+kubectl port-forward -n $NAMESPACE svc/lgtm 3001:3000 &
+PF_PID=$!
+sleep 5
+
+DASHBOARD_FILE="observability/dashboards/poc_metrics.json"
+if [ -f "$DASHBOARD_FILE" ]; then
+  jq '{dashboard: ., overwrite: true}' "$DASHBOARD_FILE" | \
+    curl -s -X POST -H "Content-Type: application/json" -u admin:admin -d @- http://localhost:3001/api/dashboards/db
+  echo ""
+  echo "Dashboard uploaded successfully!"
+else
+  echo "WARNING: Dashboard file not found at $DASHBOARD_FILE"
+fi
+
+kill $PF_PID 2>/dev/null || true

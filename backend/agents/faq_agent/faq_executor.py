@@ -87,23 +87,16 @@ class FAQExecutor(AgentExecutor):
         self._active_sessions.add(session_id)
 
         try:
+            final_event = None
             async for event in faq_agent.runner.run_async(
                 session_id=session_id,
                 user_id=user_id,
                 new_message=new_message,
             ):
                 if event.is_final_response():
-                    parts = [
-                        convert_genai_part_to_a2a(part)
-                        for part in event.content.parts
-                        if (part.text or part.file_data or part.inline_data)
-                    ]
-                    logger.debug('Yielding final response: %s', parts)
-                    await task_updater.add_artifact(parts)
-                    await task_updater.update_status(
-                        TaskState.completed, final=True
-                    )
-                    break
+                    final_event = event
+                    continue
+                
                 if not event.get_function_calls():
                     logger.debug('Yielding update response')
                     await task_updater.update_status(
@@ -122,6 +115,19 @@ class FAQExecutor(AgentExecutor):
                     )
                 else:
                     logger.debug('Skipping event')
+            
+            # Process final response after loop finishes to avoid GeneratorExit issues with OTel
+            if final_event:
+                parts = [
+                    convert_genai_part_to_a2a(part)
+                    for part in final_event.content.parts
+                    if (part.text or part.file_data or part.inline_data)
+                ]
+                logger.debug('Yielding final response: %s', parts)
+                await task_updater.add_artifact(parts)
+                await task_updater.update_status(
+                    TaskState.completed, final=True
+                )
         finally:
             # Remove from active sessions when done
             self._active_sessions.discard(session_id)

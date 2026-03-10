@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: lgtm
+spec:
+  clusterIP: None
+  selector:
+    app: lgtm
+  ports:
+    - name: grafana
+      port: 3000
+      targetPort: 3000
+    - name: otel-grpc
+      port: 4317
+      targetPort: 4317
+    - name: otel-http
+      port: 4318
+      targetPort: 4318
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: lgtm
+spec:
+  serviceName: lgtm
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lgtm
+  template:
+    metadata:
+      labels:
+        app: lgtm
+    spec:
+      nodeSelector:
+        cloud.google.com/gke-spot: "true"
+      containers:
+        - name: lgtm
+          image: grafana/otel-lgtm:0.11.9
+          env:
+            - name: GF_SERVER_ROOT_URL
+              value: "http://STATIC_IP_PLACEHOLDER/grafana/"
+            - name: GF_SERVER_SERVE_FROM_SUB_PATH
+              value: "true"
+          ports:
+            - containerPort: 3000
+            - containerPort: 4317
+            - containerPort: 4318
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          volumeMounts:
+            - name: lgtm-data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+  volumeClaimTemplates:
+    - metadata:
+        name: lgtm-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi

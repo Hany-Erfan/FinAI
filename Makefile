@@ -1,5 +1,4 @@
-.PHONY: help up down restart logs status build rebuild deploy-cluster deploy-services deploy-apps deploy-status deploy-logs deploy-cost-estimate teardown-cluster deploy-frontend deploy-host-agent deploy-faq-agent deploy-summary-agent deploy-vector-db deploy-guardrails deploy-repository
-
+.PHONY: help up down restart logs status build rebuild deploy-cluster deploy-services deploy-apps deploy-status deploy-logs deploy-cost-estimate teardown-cluster deploy-frontend deploy-host-agent deploy-faq-agent deploy-vector-db deploy-guardrails deploy-repository upload-dashboard upload-dashboard-prod
 # Load environment variables (POSIX-safe)
 ifneq (,$(wildcard .env))
 	include .env
@@ -100,7 +99,7 @@ deploy-cost-estimate: ## Show estimated GKE costs and resource breakdown
 	@kubectl get pvc -n $(K8S_NAMESPACE) -o custom-columns=NAME:.metadata.name,SIZE:.spec.resources.requests.storage,CLASS:.spec.storageClassName 2>/dev/null || echo "No PVCs found"
 	@echo ""
 	@echo "Estimated Monthly Cost: Visit https://cloud.google.com/products/calculator"
-	@echo "Autopilot charges: ~\$$0.0445/vCPU-hour, ~\$$0.00491/GB-hour"
+	@echo "Autopilot charges: ~$$0.0445/vCPU-hour, ~$$0.00491/GB-hour"
 
 # deploy-apps: deploy-frontend deploy-host-agent deploy-faq-agent deploy-summary-agent deploy-vector-db deploy-guardrails deploy-repository ## Rebuild and deploy all app services (keeps databases)
 deploy-apps: deploy-frontend deploy-host-agent deploy-faq-agent deploy-summary-agent deploy-vector-db deploy-repository ## Rebuild and deploy all app services (keeps databases)
@@ -151,10 +150,31 @@ deploy-vector-db: ## Rebuild and deploy vector-db-service only
 # 	kubectl delete pod -l app=guardrails-service -n $(K8S_NAMESPACE)
 # 	kubectl rollout status deployment/guardrails-service -n $(K8S_NAMESPACE) --timeout=120s
 
-
 deploy-repository: ## Rebuild and deploy repository-service only
 	@echo "Building and pushing repository-service..."
 	docker build --no-cache --platform linux/amd64 -t $(GCP_REGION)-docker.pkg.dev/$(GCP_PROJECT_ID)/$(GCP_REPO)/repository-service:latest -f backend/services/repository_service/Dockerfile .
 	docker push $(GCP_REGION)-docker.pkg.dev/$(GCP_PROJECT_ID)/$(GCP_REPO)/repository-service:latest
 	kubectl delete pod -l app=repository-service -n $(K8S_NAMESPACE)
 	kubectl rollout status deployment/repository-service -n $(K8S_NAMESPACE) --timeout=120s
+
+# ============================================
+# Observability
+# ============================================
+
+upload-dashboard: ## Upload POC Metrics Dashboard to local Grafana
+	@echo "Uploading POC Metrics Dashboard to Grafana..."
+	@jq '{dashboard: ., overwrite: true}' observability/dashboards/poc_metrics.json > /tmp/grafana_payload.json
+	@curl -s -X POST -H "Content-Type: application/json" -u admin:admin -d @/tmp/grafana_payload.json http://localhost:3000/api/dashboards/db
+	@rm -f /tmp/grafana_payload.json
+	@echo "\nDashboard uploaded successfully!"
+
+upload-dashboard-prod: ## Upload POC Metrics Dashboard to production Grafana (GKE)
+	@echo "Port-forwarding to Grafana in $(K8S_NAMESPACE)..."
+	@kubectl port-forward -n $(K8S_NAMESPACE) svc/lgtm 3001:3000 &
+	@sleep 5
+	@echo "Uploading dashboard..."
+	@jq '{dashboard: ., overwrite: true}' observability/dashboards/poc_metrics.json > /tmp/grafana_payload.json
+	@curl -s -X POST -H "Content-Type: application/json" -u admin:admin -d @/tmp/grafana_payload.json http://localhost:3001/api/dashboards/db
+	@rm -f /tmp/grafana_payload.json
+	@kill %1 2>/dev/null || true
+	@echo "\nDashboard uploaded to production!"

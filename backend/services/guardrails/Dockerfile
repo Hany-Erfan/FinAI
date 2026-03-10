@@ -14,6 +14,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
+# Copy observability module
+COPY observability/ ./observability/
+
 # Environment
 ENV UV_HTTP_TIMEOUT=300
 ENV UV_SYSTEM_PYTHON=1
@@ -25,6 +28,7 @@ COPY backend/services/guardrails/pyproject.toml ./pyproject.toml
 
 # Install Python dependencies declared in pyproject.toml
 RUN --mount=type=cache,target=/root/.cache/uv \
+    sed -i 's|path = "../../observability"|path = "./observability"|' pyproject.toml && \
     uv pip install --system -r pyproject.toml
 
 # Copy app code

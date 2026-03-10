@@ -52,14 +52,18 @@ The deployment is automated via the `scripts/deployment/deploy_gke.sh` script, w
 5.  **Infrastructure Setup**:
     *   Creates namespace `agentixbuddy`.
     *   Deploys **Qdrant** vector database as a StatefulSet.
+    *   Deploys **LGTM** observability stack (Grafana + Loki + Tempo) as a StatefulSet.
     *   Creates **ConfigMaps** from your local `.env` file.
 6.  **Service Deployment**:
     *   Deploys all agent microservices and the frontend.
     *   Configures inter-service communication via environment variables.
+    *   All services export OpenTelemetry traces and logs to the LGTM stack.
 7.  **Expose Application**:
     *   Deploys an **Nginx Gateway** service with type `LoadBalancer`.
     *   Assigns the reserved static IP to the LoadBalancer.
     *   Prints the final accessible URL.
+8.  **Dashboard Upload**:
+    *   Uploads the POC Effectiveness Dashboard to Grafana automatically.
 
 ---
 
@@ -69,20 +73,36 @@ The deployment is automated via the `scripts/deployment/deploy_gke.sh` script, w
 
 | Command | Description |
 | :--- | :--- |
-| `make deploy-cluster` | Full cluster deployment to GKE. |
+| `make deploy-cluster` | Full cluster deployment to GKE (includes LGTM + dashboard upload). |
+| `make deploy-services` | Redeploy services only (keeps databases and LGTM). |
 | `make teardown-cluster` | **Destructive**. Deletes all resources in the `agentixbuddy` namespace and tears down the cluster to stop costs. |
 | `make deploy-status` | Shows status of Pods, Services, and Ingress in the cluster. |
 | `make deploy-logs` | Tails logs from all running pods in the cluster. |
 | `make deploy-cost-estimate` | Estimates monthly cost based on current pod resource usage. |
 
+### Observability
+
+| Command | Description |
+| :--- | :--- |
+| `make upload-dashboard` | Upload POC Metrics Dashboard to local Grafana (localhost:3000). |
+| `make upload-dashboard-prod` | Upload POC Metrics Dashboard to production Grafana (via kubectl port-forward). |
+
 ### Local Development (Docker Compose)
 
 | Command | Description |
 | :--- | :--- |
-| `make up` | Starts the full stack locally. |
+| `make up` | Starts the full stack locally (without monitoring). |
 | `make down` | Stops containers and removes volumes. |
 | `make logs` | Follows logs for all local services. |
 | `make status` | Shows running local containers (`docker-compose ps`). |
+
+To start with the monitoring stack locally:
+```bash
+docker-compose --profile monitor up -d
+make upload-dashboard
+```
+
+Grafana is then accessible at `http://localhost:3000` (default credentials: `admin`/`admin`).
 
 ---
 
@@ -91,13 +111,29 @@ The deployment is automated via the `scripts/deployment/deploy_gke.sh` script, w
 Ensure your `.env` file contains the required environment variables:
 
 ```
-GOOGLE_API_KEY=your-google-api-key
 JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production-min-32-chars
 JWT_EXPIRE_MINUTES=480
 LANGFUSE_SECRET_KEY=your-langfuse-secret-key
 LANGFUSE_PUBLIC_KEY=your-langfuse-public-key
 LANGFUSE_BASE_URL=https://cloud.langfuse.com
 ```
+
+Ensure your `.env.secrets` file contains API keys (loaded separately for security):
+
+```
+GOOGLE_API_KEY=your-google-api-key
+```
+
+### OpenTelemetry & Logging (set automatically in docker-compose and K8s manifests)
+
+| Variable | Description | Example |
+| :--- | :--- | :--- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP collector endpoint | `lgtm:4317` |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | Export protocol | `grpc` |
+| `OTEL_TRACES_ENABLED` | Enable/disable tracing | `true` |
+| `OTEL_SERVICE_NAME` | Service name for traces | `host-agent` |
+| `LOG_LOKI_ENDPOINT` | Loki log endpoint | `lgtm:4317` |
+| `LOG_SERVICE_NAME` | Service name for logs | `host-agent` |
 
 ---
 
@@ -106,6 +142,7 @@ LANGFUSE_BASE_URL=https://cloud.langfuse.com
 *   **deployment script syntax error:** If editing scripts on Windows, ensure line endings are LF, not CRLF.
 *   **gcloud permission denied:** Run `gcloud auth login` and `gcloud auth application-default login`.
 *   **ImagePullBackOff:** Usually means the image wasn't pushed correctly or the cluster doesn't have permissions. The script handles auth, so try re-running the deployment.
+*   **Grafana not loading in production:** Ensure the LGTM pod is running (`kubectl get pods -n agentixbuddy -l app=lgtm`) and the gateway has the `/grafana/` route.
 
 ---
 
@@ -121,21 +158,21 @@ LANGFUSE_BASE_URL=https://cloud.langfuse.com
                     │  Nginx Gateway  │
                     └────────┬────────┘
                              │
-        ┌────────────────────┼────────────────────┐
-        │                    │                    │
-   ┌────▼────┐         ┌─────▼─────┐         ┌───▼────┐
-   │Frontend │         │Host Agent │         │  APIs  │
-   └─────────┘         └─────┬─────┘         └────────┘
-                             │
-                        ┌────▼────┐
-                        │FAQ Agent│
-                        └────┬────┘
-                             │
-                   ┌─────────▼──────────┐
-                   │ Vector DB Service  │
-                   └─────────┬──────────┘
-                             │
-                        ┌────▼────┐
-                        │ Qdrant  │
-                        └─────────┘
+     ┌───────────┬───────────┼───────────┬──────────┐
+     │           │           │           │          │
+┌────▼────┐ ┌───▼────┐ ┌────▼─────┐ ┌───▼───┐ ┌───▼───┐
+│Frontend │ │Grafana │ │Host Agent│ │Vector │ │  FAQ  │
+│         │ │ (LGTM) │ └────┬─────┘ │  DB   │ │ Agent │
+└─────────┘ └───▲────┘      │       └───┬───┘ └───┬───┘
+                │            │           │         │
+                │       ┌────▼──────┐    │         │
+                │       │Guardrails │    │         │
+                │       └───────────┘    │         │
+                │                   ┌────▼────┐    │
+                │                   │ Qdrant  │    │
+                │                   └─────────┘    │
+                │                                  │
+                └──── OTEL traces & logs ──────────┘
 ```
+
+All backend services export OpenTelemetry traces (via gRPC) and logs (via Loki) to the LGTM stack. The Grafana dashboard is accessible at `/grafana/` through the gateway.

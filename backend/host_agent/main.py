@@ -1,6 +1,7 @@
 """Host agent main entry point."""
 
 import os
+import time
 import traceback
 from pprint import pformat
 import secrets
@@ -27,6 +28,7 @@ from backend.host_agent.routes.admin_sessions import router as admin_sessions_ro
 from backend.bank_server.utils.user_store import get_user_by_username
 from backend.common.pass_auth import verify_password
 import backend.host_agent.routing_agent as routing_agent_module
+from backend.host_agent.utils import Language
 from observability import get_logger, setup_telemetry, instrument_app, setup_logging
 
 logger = get_logger(__name__)
@@ -272,6 +274,7 @@ def login(payload: LoginRequest, response: Response, repo = Depends(get_chat_res
             user_name=payload.username,
             session_id=payload.session_id,
         )
+    logger.info(f"session with id '{payload.session_id}' has started")
 
     return LoginResponse(
         message="Login successful",
@@ -382,6 +385,7 @@ async def chat_endpoint(
         }
 
         if not session:
+            logger.info(f"Creating new ADK session with id '{session_id}'")
             logger.info(f"Creating new session with state: {current_request_state}")
             await SESSION_SERVICE.create_session(
                 app_name=APP_NAME,
@@ -402,9 +406,17 @@ async def chat_endpoint(
                 logger.warning(f"[HTTP-DEBUG] Failed to append session state: {exc}")
 
         # 4) just call get_response_from_agent (global runner)
+        start_time = time.time()
+        
         response_text = await get_response_from_agent(
             request.message, user_id=current_user["user_id"], session_id=session_id
         )
+        
+        duration = time.time() - start_time
+        logger.info(f"Response time for session {session_id}: {duration:.2f}s")
+
+        if "Agent escalated" in response_text or "please contact our customer service team" in response_text.lower() or "يرجى الاتصال بفريق خدمة العملاء" in response_text:
+            logger.info(f"Agent escalated for session {session_id}")
 
         # If the agent responded in Arabic, prefer that for downstream messages
         lang = detect_language(response_text or request.message or "")
@@ -428,6 +440,11 @@ async def chat_endpoint(
             role=MessageRole.MODEL,
             content=masked_reply,
         )
+
+        # Language detection via script analysis
+        language = Language.AR if detect_language(final_response) == "ar" else Language.EN
+        
+        logger.info(f"Language for session {session_id}: {language}")
 
         return ChatResponse(
             response=final_response or (

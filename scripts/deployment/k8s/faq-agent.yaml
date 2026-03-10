@@ -29,6 +29,18 @@ spec:
               value: "1"
             - name: VECTOR_DB_SERVICE_URL
               value: http://vector-db-service:8004
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: lgtm:4317
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: grpc
+            - name: OTEL_TRACES_ENABLED
+              value: "true"
+            - name: OTEL_SERVICE_NAME
+              value: faq-agent
+            - name: LOG_LOKI_ENDPOINT
+              value: lgtm:4317
+            - name: LOG_SERVICE_NAME
+              value: faq-agent
           resources:
             requests:
               cpu: 100m

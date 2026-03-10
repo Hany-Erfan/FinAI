@@ -33,6 +33,18 @@ spec:
               value: ""
             - name: VECTOR_DB_COLLECTION
               value: sample_bank_products
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: lgtm:4317
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: grpc
+            - name: OTEL_TRACES_ENABLED
+              value: "true"
+            - name: OTEL_SERVICE_NAME
+              value: vector-db-service
+            - name: LOG_LOKI_ENDPOINT
+              value: lgtm:4317
+            - name: LOG_SERVICE_NAME
+              value: vector-db-service
           resources:
             requests:
               cpu: 100m

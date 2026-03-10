@@ -16,6 +16,8 @@ from starlette.routing import Route
 from starlette.middleware.cors import CORSMiddleware
 from backend.agents.retail_agent.retail_executor import RetailExecutor
 from backend.agents.retail_agent.routes.retail_health import get_retail_health
+from observability import setup_telemetry, setup_logging, instrument_app
+
 
 # Set Google API key explicitly
 os.environ["GOOGLE_API_KEY"] = os.getenv('GOOGLE_API_KEY', "***REMOVED***")
@@ -69,6 +71,13 @@ def build_retail_app():
     )
 
     app = a2a_app.build()
+    instrument_app(app)
+
+    @app.on_event("startup")
+    async def startup_event():
+        setup_telemetry()
+        setup_logging()
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],  # adjust to specific origins if needed

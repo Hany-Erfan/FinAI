@@ -18,6 +18,7 @@ from opentelemetry.instrumentation.starlette import StarletteInstrumentor
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
+
 # Try to import additional instrumentors
 try:
     from opentelemetry.instrumentation.aiohttp import AioHTTPClientInstrumentor
@@ -46,6 +47,13 @@ def setup_telemetry() -> Optional[TracerProvider]:
     """
     Setup OpenTelemetry tracing with OTLP exporter and automatic instrumentation.
     """
+    
+    # Check if a provider is already set (important for uvicorn reloads)
+    existing_provider = trace.get_tracer_provider()
+    if isinstance(existing_provider, TracerProvider):
+        logger.debug("OpenTelemetry tracing already initialized (TracerProvider)")
+        return existing_provider
+
     # Load settings from environment variables
     settings = TelemetrySettings()
     
@@ -120,6 +128,7 @@ def setup_telemetry() -> Optional[TracerProvider]:
         if settings.enable_logging_instrumentation:
             LoggingInstrumentor().instrument(set_logging_format=True)
         
+
         return provider
         
     except Exception as e:

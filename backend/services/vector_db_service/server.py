@@ -5,12 +5,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.services.vector_db_service.routes.vector_db_health import vector_db_health_router
 from backend.services.vector_db_service.routes.retreive_product import retreive_product_router
 from backend.services.vector_db_service.routes.manage_documents import manage_documents_router
+from observability import setup_telemetry, setup_logging, instrument_app
 
 vector_db_app = FastAPI(
     title="Vector DB Service",
     description="A service for Product RAG",
     version="0.1.0",
 )
+instrument_app(vector_db_app)
+
+@vector_db_app.on_event("startup")
+async def startup_event():
+    setup_telemetry()
+    setup_logging()
 
 # Add CORS middleware to allow cross-origin requests
 vector_db_app.add_middleware(

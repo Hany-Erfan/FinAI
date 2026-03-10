@@ -26,6 +26,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from guardrails import Guard
+from observability import setup_telemetry, setup_logging, instrument_app
 from guardrails.validators import (
     Validator,
     register_validator,
@@ -38,12 +39,19 @@ from guardrails.hub import (
     RestrictToTopic,
     SecretsPresent,
 )
+from observability import setup_telemetry, setup_logging, instrument_app
 
 app = FastAPI(
     title="Guardrails Service",
     description="Validation service for routing agent inputs and outputs using Guardrails Hub validators.",
     version="1.4.0",
 )
+instrument_app(app)
+
+@app.on_event("startup")
+async def startup_event():
+    setup_telemetry()
+    setup_logging()
 
 # --- CORS (frontend at :5173 calling this service at :8005) ---
 app.add_middleware(
@@ -57,6 +65,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+instrument_app(app)
+
+@app.on_event("startup")
+async def startup_event():
+    setup_telemetry()
+    setup_logging()
 
 class ValidationRequest(BaseModel):
     message: str
