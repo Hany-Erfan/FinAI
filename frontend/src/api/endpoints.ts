@@ -19,4 +19,6 @@ export const Endpoints = {
   GET_MESSAGES: (session_id: string) => `${REPOSITORY_BASE}/sessions/${session_id}/messages`,
   ADMIN_SESSIONS: `${API_BASE}/admin/sessions`,
   ADMIN_SESSION_DETAIL: (id: string) => `${API_BASE}/admin/sessions/${id}`,
+  ADMIN_ANALYTICS: (start: string, end: string) =>
+    `${API_BASE}/admin/analytics?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
 } as const;

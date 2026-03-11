@@ -49,6 +49,8 @@ spec:
               value: lgtm:4317
             - name: LOG_SERVICE_NAME
               value: host-agent
+            - name: LOKI_URL
+              value: http://lgtm:3100
           resources:
             requests:
               cpu: 100m

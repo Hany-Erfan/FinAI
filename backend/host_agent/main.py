@@ -24,6 +24,7 @@ from google.adk.memory import InMemoryMemoryService
 from google.genai import types
 
 from backend.bank_server.utils.security_deps import auth_cookie_name, csrf_cookie_name, get_current_user, refresh_session_cookies, verify_csrf
+from backend.host_agent.routes.admin_analytics import router as admin_analytics_router
 from backend.host_agent.routes.admin_sessions import router as admin_sessions_router
 from backend.bank_server.utils.user_store import get_user_by_username
 from backend.common.pass_auth import verify_password
@@ -73,6 +74,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(admin_sessions_router)
+app.include_router(admin_analytics_router)
 
 security = HTTPBearer()
 

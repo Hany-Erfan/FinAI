@@ -1,0 +1,186 @@
+/* AnalysisDashboard — extends Backoffice base classes */
+
+.dashboard-time-range {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.dashboard-time-range button {
+    padding: 0.4rem 0.9rem;
+    border: 1px solid #d0d5dd;
+    border-radius: 6px;
+    background: #fff;
+    color: #555;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.dashboard-time-range button:hover {
+    background: #f0f4ff;
+    border-color: #007bff;
+    color: #007bff;
+}
+
+.dashboard-time-range button.active {
+    background: #007bff;
+    color: #fff;
+    border-color: #007bff;
+}
+
+/* 2x2 grid */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+@media (max-width: 768px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Panel card */
+.dashboard-panel {
+    padding: 1.5rem;
+    border: 1px solid #e1e4e8;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    display: flex;
+    flex-direction: column;
+}
+
+.dashboard-panel h3 {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+/* Total Sessions */
+.stat-big-number {
+    font-size: 3rem;
+    font-weight: 700;
+    color: #007bff;
+    line-height: 1;
+    margin-bottom: 0.75rem;
+}
+
+.sparkline-container {
+    flex: 1;
+    min-height: 60px;
+}
+
+.sparkline-container svg {
+    width: 100%;
+    height: 100%;
+}
+
+/* Gauge */
+.gauge-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem 0;
+}
+
+.gauge-value {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-top: 0.5rem;
+}
+
+.gauge-subtitle {
+    font-size: 0.8rem;
+    color: #888;
+    margin-top: 0.25rem;
+}
+
+/* Line chart */
+.line-chart-container {
+    flex: 1;
+    min-height: 180px;
+}
+
+.line-chart-container svg {
+    width: 100%;
+    height: 100%;
+}
+
+/* Donut */
+.donut-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2rem;
+    padding: 1rem 0;
+    flex-wrap: wrap;
+}
+
+.donut-chart {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    position: relative;
+}
+
+.donut-hole {
+    position: absolute;
+    top: 25%;
+    left: 25%;
+    width: 50%;
+    height: 50%;
+    border-radius: 50%;
+    background: #fff;
+}
+
+.donut-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.donut-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: #444;
+}
+
+.donut-legend-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+/* Loading / error states */
+.dashboard-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+    color: #888;
+    font-size: 1rem;
+}
+
+.dashboard-error {
+    color: #dc3545;
+    padding: 1rem;
+    text-align: center;
+}
+
+/* Avg RT big number */
+.rt-big-number {
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 0.5rem;
+}

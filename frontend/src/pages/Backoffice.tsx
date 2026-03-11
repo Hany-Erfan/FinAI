@@ -1,6 +1,6 @@
 import React, { useState, useEffect, ChangeEvent, FormEvent, useRef } from 'react';
 import axios from 'axios';
-import { Endpoints, GRAFANA_BASE } from '../api/endpoints';
+import { Endpoints } from '../api/endpoints';
 import { useNavigate } from 'react-router-dom';
 import { sessionHeaders, csrfHeaders } from '../utils/authUtils';
 import './Backoffice.css';
@@ -313,7 +313,7 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
             <header className="backoffice-header">
                 <h1>Document Backoffice</h1>
                 <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                    <button onClick={() => window.open(`${GRAFANA_BASE}/d/poc_effectiveness/poc-effectiveness-dashboard`, '_blank')} className="btn btn-primary">Analysis Dashboard</button>
+                    <button onClick={() => navigate('/analysis-dashboard')} className="btn btn-primary">Analysis Dashboard</button>
                     <button onClick={() => openModal()} className="btn btn-success">+ Add New</button>
                     <button onClick={() => navigate('/session-explorer')} className="btn btn-primary">Session Explorer</button>
                     <button onClick={() => navigate('/chat')} className="btn btn-secondary">Back to Chat</button>

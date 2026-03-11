@@ -57,6 +57,7 @@ services:
       - OTEL_SERVICE_NAME=host-agent
       - LOG_LOKI_ENDPOINT=lgtm:4317
       - LOG_SERVICE_NAME=host-agent
+      - LOKI_URL=http://lgtm:3100
     command: >
       uvicorn backend.host_agent.main:app --host 0.0.0.0 --port 8000 --reload --log-level debug
 

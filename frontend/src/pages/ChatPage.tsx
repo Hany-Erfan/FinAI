@@ -197,6 +197,7 @@ const ChatPage = ({ auth, onLogout, sessionId, inactivityTimeout }) => {
           <div className="admin-box">
             <button onClick={() => navigate('/backoffice')}>Manage FAQs</button>
             <button onClick={() => navigate('/session-explorer')}>Session Explorer</button>
+            <button onClick={() => navigate('/analysis-dashboard')}>Analysis Dashboard</button>
           </div>
         ) : null}
         {/* Sidebar Login/Logout */}
