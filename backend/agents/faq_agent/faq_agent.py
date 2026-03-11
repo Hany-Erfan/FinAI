@@ -32,7 +32,7 @@ async def retrieve_product_info(user_query: str) -> str:
 def create_faq_agent(user_id: str) -> LlmAgent:
     """Constructs the ADK agent."""
     return LlmAgent(
-        model='gemini-3-flash-preview',
+        model='gemini-3.1-flash-lite-preview',
         name='faq_agent',
         description='A bilingual FAQ assistant that answers questions about banking products using RAG.',
         instruction="""You are a specialized bilingual FAQ assistant. Your primary function is to answer user queries regarding banking products by strictly using the provided RAG tool to retrieve information.
@@ -65,7 +65,7 @@ class FAQAgent(Agent):
         """Initialize the retail agent."""
         # Create the Google ADK agent
         google_agent = create_faq_agent(user_id)
-        
+
         # Initialize base class
         super().__init__(
             app_name='faq_agent',
@@ -86,5 +86,5 @@ class FAQAgent(Agent):
             FAQAgentCache[user_id] = cls(user_id)
         else:
             print(f"[FAQ] Using cached agent instance for user {user_id}")
-        
+
         return FAQAgentCache[user_id]

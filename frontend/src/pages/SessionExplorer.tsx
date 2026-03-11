@@ -115,6 +115,52 @@ export default function SessionExplorer({ sessionId }: SessionExplorerProps) {
         setError('');
     };
 
+    const exportCsv = () => {
+        if (!detail) return;
+
+        const escapeCsv = (value: string) => {
+            if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+                return '"' + value.replace(/"/g, '""') + '"';
+            }
+            return value;
+        };
+
+        const rows: string[][] = [
+            ['Session ID', detail.id],
+            ['User', detail.user_name || detail.user_id || 'Unknown'],
+            ['Status', detail.status],
+            ['Created', detail.created_at],
+            ['Ended', detail.ended_at || ''],
+            [],
+            ['Role', 'Content', 'Timestamp'],
+            ...detail.messages.map((msg) => [
+                msg.role,
+                msg.content,
+                msg.created_at,
+            ]),
+        ];
+
+        if (detail.summary) {
+            rows.push(
+                [],
+                ['Summary'],
+                ['Text', detail.summary.summary_text],
+                ['Key Topics', detail.summary.key_topics.join('; ')],
+                ['Sentiment', detail.summary.sentiment || ''],
+                ['Resolution', detail.summary.resolution_status],
+            );
+        }
+
+        const csv = rows.map((r) => r.map(escapeCsv).join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `session-${detail.id}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
     // ---- Detail View ----
     if (detail) {
         return (
@@ -127,6 +173,9 @@ export default function SessionExplorer({ sessionId }: SessionExplorerProps) {
                         </button>
                         <button onClick={() => navigate('/chat')} className="btn btn-secondary">
                             Back to Chat
+                        </button>
+                        <button onClick={exportCsv} className="btn btn-primary">
+                            Export CSV
                         </button>
                     </div>
                 </header>
