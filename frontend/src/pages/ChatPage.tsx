@@ -40,6 +40,7 @@ const AgentIcon = () => (
 const ChatPage = ({ auth, onLogout, sessionId, inactivityTimeout }) => {
   const INACTIVITY_MINUTES = inactivityTimeout / 1000 / 60;
   const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(sessionId);
   const [input, setInput] = useState('');
@@ -67,6 +68,22 @@ const ChatPage = ({ auth, onLogout, sessionId, inactivityTimeout }) => {
     document.addEventListener('click', handleOutsideClick);
     return () => document.removeEventListener('click', handleOutsideClick);
   }, []);
+
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = 'hidden';
+      const handleEsc = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') setSidebarOpen(false);
+      };
+      document.addEventListener('keydown', handleEsc);
+      return () => {
+        document.body.style.overflow = '';
+        document.removeEventListener('keydown', handleEsc);
+      };
+    } else {
+      document.body.style.overflow = '';
+    }
+  }, [sidebarOpen]);
 
   // Fetch messages from DB whenever active session changes
   useEffect(() => {
@@ -192,7 +209,24 @@ const ChatPage = ({ auth, onLogout, sessionId, inactivityTimeout }) => {
 
   return (
     <div className="page-container">
-      <div className="sidebar">
+      {sidebarOpen && (
+        <div
+          className="sidebar-backdrop"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+      <div
+        id="main-sidebar"
+        className={`sidebar${sidebarOpen ? ' sidebar--open' : ''}`}
+      >
+        <button
+          className="sidebar-close-btn"
+          aria-label="Close menu"
+          onClick={() => setSidebarOpen(false)}
+        >
+          &#x2715;
+        </button>
         {auth.role === "admin" ? (
           <div className="admin-box">
             <button onClick={() => navigate('/backoffice')}>Manage FAQs</button>
@@ -215,7 +249,20 @@ const ChatPage = ({ auth, onLogout, sessionId, inactivityTimeout }) => {
       </div>
       <div className="chat-container">
         <div className="chat-header">
-          <div className="header-placeholder"></div>
+          <button
+            className="hamburger-btn"
+            aria-label="Open navigation menu"
+            aria-expanded={sidebarOpen}
+            aria-controls="main-sidebar"
+            onClick={() => {
+              document.getElementById('session-popover')?.classList.remove('open');
+              setSidebarOpen(true);
+            }}
+          >
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
           <h2>AgentixBuddy</h2>
           <div className="header-placeholder"></div>
            <div className="session-wrapper">

@@ -209,3 +209,94 @@
     margin: 0;
     font-size: 1rem;
 }
+
+/* ── Mobile responsive (768px and below) ── */
+@media (max-width: 768px) {
+
+    /* Container: reduce padding */
+    .backoffice-container {
+        padding: 1rem;
+    }
+
+    /* Header: smaller title, wrap buttons */
+    .backoffice-header h1 {
+        font-size: 1.4rem;
+    }
+
+    .backoffice-header > div {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .backoffice-header .btn {
+        font-size: 0.75rem;
+        padding: 0.5rem 0.6rem;
+        white-space: nowrap;
+        width: auto !important;
+        min-width: 0 !important;
+    }
+
+    /* Section card: reduce padding */
+    .section-card {
+        padding: 1rem;
+    }
+
+    /* Table → card layout */
+    .session-table thead {
+        display: none;
+    }
+
+    .session-table tbody tr {
+        display: block;
+        border: 1px solid #e1e4e8;
+        border-radius: 8px;
+        margin-bottom: 0.75rem;
+        padding: 0.75rem;
+        background: #fff;
+    }
+
+    .session-table tbody tr.clickable-row:hover {
+        background-color: #f0f4ff;
+    }
+
+    .session-table td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.35rem 0.25rem;
+        border: none;
+        font-size: 0.9rem;
+    }
+
+    .session-table td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        color: #555;
+        font-size: 0.8rem;
+        flex-shrink: 0;
+        margin-right: 0.5rem;
+    }
+
+    /* Conversation bubbles: full width on mobile */
+    .explorer-bubble {
+        max-width: 85%;
+    }
+
+    /* Summary meta: stack vertically */
+    .summary-meta {
+        flex-direction: column;
+        gap: 0.4rem;
+    }
+
+    /* Session meta: single column */
+    .session-meta {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    /* Detail header: stack */
+    .session-detail-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}

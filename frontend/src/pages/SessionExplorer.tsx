@@ -331,16 +331,16 @@ export default function SessionExplorer({ sessionId }: SessionExplorerProps) {
                                         className="clickable-row"
                                         onClick={() => fetchDetail(s.id)}
                                     >
-                                        <td>{s.user_name || s.user_id || '-'}</td>
-                                        <td>
+                                        <td data-label="User">{s.user_name || s.user_id || '-'}</td>
+                                        <td data-label="Status">
                                             <span className={`status-badge ${s.status}`}>
                                                 {s.status}
                                             </span>
                                         </td>
-                                        <td>{formatDate(s.created_at)}</td>
-                                        <td>{s.ended_at ? formatDate(s.ended_at) : '-'}</td>
-                                        <td>{s.message_count}</td>
-                                        <td>
+                                        <td data-label="Created">{formatDate(s.created_at)}</td>
+                                        <td data-label="Ended">{s.ended_at ? formatDate(s.ended_at) : '-'}</td>
+                                        <td data-label="Messages">{s.message_count}</td>
+                                        <td data-label="Summary">
                                             <span
                                                 className={`summary-indicator ${s.has_summary ? 'has-summary' : 'no-summary'}`}
                                                 title={s.has_summary ? 'Summary available' : 'No summary'}
