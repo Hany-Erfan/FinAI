@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: agentixbuddy-cert
+  namespace: agentixbuddy
+spec:
+  secretName: agentixbuddy-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+  - app.staging.agentixbuddy.com

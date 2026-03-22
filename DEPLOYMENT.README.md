@@ -137,7 +137,23 @@ GOOGLE_API_KEY=your-google-api-key
 
 ---
 
-## 5. Troubleshooting
+## 5. HTTPS Configuration (cert-manager & Let's Encrypt)
+
+The application uses **cert-manager** with Let's Encrypt (HTTP-01 challenge) to automatically provision and renew TLS certificates. HTTPS is enforced by default.
+
+When you run `make deploy-cluster` on a fresh cluster:
+1. `cert-manager` is installed.
+2. A temporary "dummy" TLS certificate is generated so Nginx can start successfully.
+3. Once running, Let's Encrypt verifies the domain and seamlessly replaces the dummy certificate with the real, valid TLS certificate in the background (usually takes 1-3 minutes).
+4. All HTTP traffic is automatically `301 Redirected` to HTTPS.
+
+| Command | Description |
+| :--- | :--- |
+| `kubectl get certificate agentixbuddy-cert -n agentixbuddy -w` | Monitor the Let's Encrypt certificate provisioning status. Wait until `READY=True`. |
+
+---
+
+## 6. Troubleshooting
 
 *   **deployment script syntax error:** If editing scripts on Windows, ensure line endings are LF, not CRLF.
 *   **gcloud permission denied:** Run `gcloud auth login` and `gcloud auth application-default login`.

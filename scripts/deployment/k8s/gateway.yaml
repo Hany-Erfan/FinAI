@@ -10,9 +10,30 @@ data:
     http {
       client_max_body_size 20M;
 
+      # HTTP Server (Redirects to HTTPS except for ACME)
       server {
         listen 80;
         server_name _;
+
+        # ACME HTTP-01 challenge for Let's Encrypt (Must remain on HTTP)
+        location /.well-known/acme-challenge/ {
+          proxy_pass http://acme-solver.agentixbuddy.svc.cluster.local:8089;
+          proxy_set_header Host $host;
+        }
+
+        # Redirect everything else to HTTPS
+        location / {
+          return 301 https://$host$request_uri;
+        }
+      }
+
+      # HTTPS Server
+      server {
+        listen 443 ssl;
+        server_name app.staging.agentixbuddy.com;
+
+        ssl_certificate /etc/nginx/certs/tls.crt;
+        ssl_certificate_key /etc/nginx/certs/tls.key;
 
         # Frontend
         location / {
@@ -21,6 +42,12 @@ data:
           proxy_set_header X-Real-IP $remote_addr;
           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
           proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # ACME HTTP-01 challenge for Let's Encrypt
+        location /.well-known/acme-challenge/ {
+          proxy_pass http://acme-solver.agentixbuddy.svc.cluster.local:8089;
+          proxy_set_header Host $host;
         }
 
         # Host Agent API
@@ -42,16 +69,6 @@ data:
           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
           proxy_set_header X-Forwarded-Proto $scheme;
         }
-
-        # Guardrails Service
-        # location /guardrails_service/ {
-        #   rewrite ^/guardrails_service/?(.*)$ /$1 break;
-        #   proxy_pass http://guardrails-service:8005/;
-        #   proxy_set_header Host $host;
-        #   proxy_set_header X-Real-IP $remote_addr;
-        #   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        #   proxy_set_header X-Forwarded-Proto $scheme;
-        # }
 
         # Repository Service
         location /repository/ {
@@ -117,14 +134,21 @@ spec:
           image: nginx:alpine
           ports:
             - containerPort: 80
+            - containerPort: 443
           volumeMounts:
             - name: config
               mountPath: /etc/nginx/nginx.conf
               subPath: nginx.conf
+            - name: tls-certs
+              mountPath: /etc/nginx/certs
+              readOnly: true
       volumes:
         - name: config
           configMap:
             name: gateway-config
+        - name: tls-certs
+          secret:
+            secretName: agentixbuddy-tls
 ---
 apiVersion: v1
 kind: Service
@@ -136,6 +160,10 @@ spec:
   selector:
     app: gateway
   ports:
-    - port: 80
+    - name: http
+      port: 80
       targetPort: 80
+    - name: https
+      port: 443
+      targetPort: 443
   loadBalancerIP: STATIC_IP_PLACEHOLDER

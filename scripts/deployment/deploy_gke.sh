@@ -84,7 +84,7 @@ gcloud container clusters get-credentials $CLUSTER_NAME --region $REGION
 STATIC_IP_NAME="agentixbuddy-ingress-ip"
 if [ -z "$(gcloud compute addresses describe "$STATIC_IP_NAME" --region "$REGION" --format=json 2>/dev/null | jq -r '.address // empty')" ]; then
   echo "Static IP not found. Creating static IP: $STATIC_IP_NAME ..."
-  gcloud compute addresses create "$STATIC_IP_NAME" --region "$REGION"
+  # gcloud compute addresses create "$STATIC_IP_NAME" --region "$REGION"
 else
   echo "Static IP already exists: $STATIC_IP_NAME"
 fi
@@ -123,22 +123,30 @@ kubectl create configmap app-env \
   -n $NAMESPACE \
   --dry-run=client -o yaml | kubectl apply -f -
 
+# No disruptive cleanup needed. Using graceful rollout restarts at the end of the script.
+
 # ----------------------------
-# --- CLEANUP EXISTING RESOURCES ---
+# --- Install Cert-Manager ---
 # ----------------------------
-if [ "${SKIP_DB}" = "1" ]; then
-  echo "Cleaning up app deployments only (keeping database)..."
-  kubectl delete deployment --all -n $NAMESPACE --ignore-not-found
-  kubectl delete job --all -n $NAMESPACE --ignore-not-found
-else
-  echo "Cleaning up all deployments, statefulsets, jobs, pods, services, PVCs in $NAMESPACE..."
-  kubectl delete deployment --all -n $NAMESPACE --ignore-not-found
-  kubectl delete statefulset --all -n $NAMESPACE --ignore-not-found
-  kubectl delete job --all -n $NAMESPACE --ignore-not-found
-  kubectl delete pod --all -n $NAMESPACE --ignore-not-found
-  kubectl delete service --all -n $NAMESPACE --ignore-not-found
-  #kubectl delete pvc --all -n $NAMESPACE --ignore-not-found
-fi
+echo "Installing cert-manager (Phase 1)..."
+# Using kubectl apply directly on the latest stable release
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.4/cert-manager.yaml
+
+echo "Waiting for cert-manager custom resource definitions..."
+kubectl wait --for=condition=Established crd/clusterissuers.cert-manager.io --timeout=300s
+kubectl wait --for=condition=Established crd/certificates.cert-manager.io --timeout=300s
+
+echo "Waiting for cert-manager deployment to be ready..."
+kubectl rollout status deployment/cert-manager-webhook -n cert-manager --timeout=300s
+
+# ----------------------------
+# --- Apply ACME Resources ---
+# ----------------------------
+echo "Applying Let's Encrypt ClusterIssuer and Certificate resources..."
+kubectl apply -f "$K8S_DIR/cert-manager/cluster-issuer.yaml"
+kubectl apply -f "$K8S_DIR/cert-manager/acme-solver-svc.yaml" -n $NAMESPACE
+kubectl apply -f "$K8S_DIR/cert-manager/certificate.yaml" -n $NAMESPACE
+
 
 # ----------------------------
 # --- Deploy Qdrant (Vector Database) ---
@@ -265,7 +273,21 @@ done
 # --- Deploy Gateway (Nginx) ---
 # ----------------------------
 echo "Deploying Gateway with static IP: $INGRESS_STATIC_IP"
+
+# Create a temporary dummy secret if it doesn't exist, to prevent Nginx crashing
+# before Let's Encrypt finishes provisioning the real certificate.
+if ! kubectl get secret agentixbuddy-tls -n $NAMESPACE >/dev/null 2>&1; then
+  echo "Generating temporary bootstrapping TLS certificate..."
+  openssl req -x509 -nodes -days 1 -newkey rsa:2048 -keyout /tmp/tls.key -out /tmp/tls.crt -subj "/CN=temporary.agentixbuddy.com" >/dev/null 2>&1
+  kubectl create secret tls agentixbuddy-tls -n $NAMESPACE --key /tmp/tls.key --cert /tmp/tls.crt
+  rm /tmp/tls.key /tmp/tls.crt
+fi
+
 sed "s/STATIC_IP_PLACEHOLDER/$INGRESS_STATIC_IP/g" "$K8S_DIR/gateway.yaml" | kubectl apply -n $NAMESPACE -f -
+
+# Force a zero-downtime rolling restart for all deployments (forces pulling the newly built :latest images)
+echo "Triggering zero-downtime rolling restart for all services..."
+kubectl rollout restart deployment -n $NAMESPACE
 
 echo ""
 echo "--------------------------------------------------------"
