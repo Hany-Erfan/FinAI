@@ -250,6 +250,119 @@
 
 .change-disclaimer-popup {
   display: flex;
-  align-items: flex-start; 
+  align-items: flex-start;
   gap: 8px;
+}
+
+/* ── Mobile responsive (768px and below) ── */
+@media (max-width: 768px) {
+
+    /* Container: reduce padding */
+    .backoffice-container {
+        padding: 1rem;
+    }
+
+    /* Header: smaller title */
+    .backoffice-header h1 {
+        font-size: 1.4rem;
+    }
+
+    /* Header buttons: stay at natural width, don't expand to 100% */
+    .backoffice-header .btn {
+        width: auto !important;
+        min-width: 0 !important;
+        white-space: nowrap;
+        font-size: 0.75rem;
+        padding: 0.5rem 0.6rem;
+    }
+
+    /* Upload controls: stack vertically */
+    .upload-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .upload-controls input[type="file"] {
+        width: 100%;
+    }
+
+    .upload-controls .btn {
+        width: 100% !important;
+    }
+
+    /* Knowledge base section header: allow wrap, shrink h2 */
+    .section-card > div:first-child {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .section-card > div:first-child h2 {
+        font-size: 1.1rem;
+        margin: 0;
+    }
+
+    /* Knowledge base delete all button: keep natural width */
+    .section-card .btn-danger {
+        width: auto !important;
+        min-width: 0 !important;
+        white-space: nowrap;
+    }
+
+    /* Table → card layout */
+    .product-table thead {
+        display: none;
+    }
+
+    .product-table tbody tr {
+        display: block;
+        border: 1px solid #e1e4e8;
+        border-radius: 8px;
+        margin-bottom: 0.75rem;
+        padding: 0.75rem;
+        background: #fff;
+    }
+
+    .product-table td {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 0.4rem 0.25rem;
+        border: none;
+        font-size: 0.9rem;
+    }
+
+    .product-table td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        color: #555;
+        font-size: 0.8rem;
+        flex-shrink: 0;
+        margin-right: 0.75rem;
+        padding-top: 2px;
+    }
+
+    /* Actions cell: keep buttons in a row on the right */
+    .product-table td:last-child {
+        justify-content: flex-end;
+        gap: 0.5rem;
+        padding-top: 0.5rem;
+        border-top: 1px solid #f0f0f0;
+        margin-top: 0.25rem;
+    }
+
+    .product-table td:last-child::before {
+        display: none;
+    }
+
+    .action-link {
+        width: auto !important;
+        min-width: 0 !important;
+    }
+
+    /* Modal: full width on small screens */
+    .modal-content {
+        padding: 1.25rem;
+        width: 95%;
+        max-height: 95vh;
+    }
 }

@@ -41,6 +41,20 @@
     .dashboard-grid {
         grid-template-columns: 1fr;
     }
+
+    /* Prevent global 480px `button { width: 100% }` from stacking these */
+    .dashboard-time-range button,
+    .backoffice-header .btn {
+        width: auto !important;
+        min-width: 0 !important;
+        white-space: nowrap;
+    }
+
+    /* Shrink header buttons to fit in one row */
+    .backoffice-header .btn {
+        font-size: 0.75rem;
+        padding: 0.5rem 0.6rem;
+    }
 }
 
 /* Panel card */

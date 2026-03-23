@@ -2075,24 +2075,46 @@ html,
 
 body {
   margin: 0;
+  padding: 0;
   min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
   background: linear-gradient(160deg, #eef7ff, #ddeeff);
 }
 
 .page {
   min-height: 100vh;
+  width: 100%;
   display: grid;
   place-items: center;
+  padding: 16px;
 }
 
 .card {
-  width: min(420px, 100%);
+  width: 100%;
+  max-width: 420px;
+  margin: auto;
   background: #fff;
   border-radius: 16px;
-  padding: 24px;
+  padding: 32px;
   box-shadow: 0 12px 30px rgba(15, 35, 60, 0.12);
   display: grid;
-  gap: 12px;
+  gap: 16px;
+  min-width: 0;
+}
+
+@media (max-width: 480px) {
+  .page {
+    padding: 8px;
+  }
+  .card {
+    padding: 24px 16px;
+    border-radius: 12px;
+  }
+  input, button {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 .card.wide {
@@ -2197,3 +2219,157 @@ button:disabled {
     position: relative;
     display: inline-block;
   }
+
+/* ── Hamburger button (desktop: hidden) ── */
+.hamburger-btn {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  width: 36px;
+  height: 36px;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  padding: 6px;
+  flex-shrink: 0;
+  color: var(--text-primary);
+}
+.hamburger-btn span {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background-color: currentColor;
+  border-radius: 2px;
+}
+.hamburger-btn:hover { background-color: rgba(0, 0, 0, 0.05); }
+
+/* ── Sidebar close button (desktop: hidden) ── */
+.sidebar-close-btn {
+  display: none;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  padding: 0;
+  line-height: 1;
+}
+.sidebar-close-btn:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+  color: var(--text-primary);
+}
+
+/* ── Sidebar backdrop ── */
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 99;
+}
+
+/* ── Touch optimization ── */
+.hamburger-btn,
+.sidebar-backdrop,
+.sidebar-close-btn,
+.session-btn {
+  touch-action: manipulation;
+}
+
+/* ── Mobile layout (768px and below) ── */
+@media (max-width: 768px) {
+
+  /* Sidebar: slide-in overlay */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 260px;
+    transform: translateX(-260px);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 100;
+    overflow-y: auto;
+  }
+  .sidebar.sidebar--open {
+    transform: translateX(0);
+  }
+
+  /* Sidebar content: make room for close button */
+  .admin-box {
+    padding-top: 48px;
+  }
+
+  /* Sidebar close button: show on mobile */
+  .sidebar-close-btn {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  /* Hamburger: show on mobile */
+  .hamburger-btn {
+    display: flex;
+  }
+
+  /* Chat container: full width (sidebar is no longer in flow) */
+  .chat-container {
+    width: 100%;
+  }
+
+  /* Header: tighten padding, smaller title */
+  .chat-header {
+    padding: 0.75rem;
+  }
+  .chat-header h2 {
+    font-size: 1.2rem;
+  }
+
+  /* Chat messages: reduce side padding */
+  .chat-messages {
+    padding: 1rem 0.75rem;
+  }
+
+  /* Chat input: tighten */
+  .chat-input-area {
+    padding: 0.75rem;
+  }
+
+  /* Session popover: bottom sheet on mobile */
+  .session-wrapper {
+    position: static;
+  }
+  .session-popover {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    transform: none;
+    border-radius: 12px 12px 0 0;
+    border-bottom: none;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.12);
+    z-index: 200;
+    padding: 16px;
+    font-size: 0.85rem;
+  }
+  .session-popover-arrow {
+    display: none;
+  }
+
+  /* Counter the global 480px `button { width: 100% }` rule */
+  .hamburger-btn,
+  .sidebar-close-btn {
+    width: 36px !important;
+    min-width: 36px !important;
+  }
+}

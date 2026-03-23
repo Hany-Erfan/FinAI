@@ -577,9 +577,9 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
                             <tbody>
                                 {products.map((product: Product) => (
                                     <tr key={product.product_id}>
-                                        <td><span className="category-badge">{product.category}</span></td>
-                                        <td>{product.question_en}</td>
-                                        <td className="rtl">{product.question_ar}</td>
+                                        <td data-label="Category"><span className="category-badge">{product.category}</span></td>
+                                        <td data-label="Question (EN)">{product.question_en}</td>
+                                        <td data-label="Question (AR)" className="rtl">{product.question_ar}</td>
                                         <td>
                                             <button onClick={() => openModal(product)} className="action-link action-edit">Edit</button>
                                             <button onClick={() => handleDelete(product.product_id)} className="action-link action-delete">Delete</button>
