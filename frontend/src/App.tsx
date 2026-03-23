@@ -113,9 +113,16 @@ export default function App() {
         clearTimeout(inactivityTimerRef.current);
       }
       inactivityTimerRef.current = setTimeout(() => {
-        handleLogout();
+        handleLogoutRef.current();
       }, INACTIVITY_TIMEOUT_MS);
     }
+
+  function handleTabClose(e: BeforeUnloadEvent) {
+    e.preventDefault(); 
+    handleLogout();
+  }
+
+  window.addEventListener('beforeunload', handleTabClose);
 
     const events = ["mousemove", "mousedown", "keydown", "touchstart", "scroll"];
     events.forEach((e) => window.addEventListener(e, scheduleLogout, { passive: true }));
