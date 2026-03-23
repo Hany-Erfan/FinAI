@@ -117,12 +117,28 @@ export default function App() {
       }, INACTIVITY_TIMEOUT_MS);
     }
 
+    // handling mobile browser on close + timeout
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'hidden') {
+        localStorage.setItem('session_hidden_at', String(Date.now()));
+      } else {
+        const stored = localStorage.getItem('session_hidden_at');
+        if (!stored) return;
+        const elapsed = Date.now() - Number(stored);
+        localStorage.removeItem('session_hidden_at');
+        if (elapsed >= INACTIVITY_TIMEOUT_MS) {
+          handleLogout();
+        } else {
+          scheduleLogout();
+        }
+      }
+    }
   function handleTabClose(e: BeforeUnloadEvent) {
-    e.preventDefault(); 
     handleLogout();
   }
 
   window.addEventListener('beforeunload', handleTabClose);
+  document.addEventListener('visibilitychange', handleVisibilityChange);
 
     const events = ["mousemove", "mousedown", "keydown", "touchstart", "scroll"];
     events.forEach((e) => window.addEventListener(e, scheduleLogout, { passive: true }));
@@ -130,6 +146,9 @@ export default function App() {
 
     return () => {
         events.forEach((e) => window.removeEventListener(e, scheduleLogout));
+        // clean up for listeners
+        window.removeEventListener('beforeunload', handleTabClose);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
         if (inactivityTimerRef.current) {
           clearTimeout(inactivityTimerRef.current);
           inactivityTimerRef.current = null;
