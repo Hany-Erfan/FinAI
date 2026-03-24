@@ -1,0 +1,79 @@
+# To get started with Dependabot version updates, you'll need to specify which
+# package ecosystems to update and where the package manifests are located.
+# Please see the documentation for all configuration options:
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # 1. TypeScript / npm - For your Frontend
+  - package-ecosystem: "npm"
+    directory: "/frontend"               
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "08:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+  
+  # 2. Python (pip/uv) - For all your Backend Agents
+  - package-ecosystem: "pip"
+    directories:
+      - "/backend/host_agent"            
+      - "/backend/common"
+      - "/backend/bank_server"
+      - "/backend/agents/**"             
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "08:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 25 # Increased limit to allow multiple single PRs
+    groups:
+      # Web Framework
+      fastapi-group:
+        patterns: ["fastapi"]
+      uvicorn-group:
+        patterns: ["uvicorn"]
+
+      # Google AI & Protocols
+      google-generativeai-group:
+        patterns: ["google-generativeai"]
+      google-adk-group:
+        patterns: ["google-adk"]
+      google-genai-group:
+        patterns: ["google-genai"]
+      a2a-protocol-group:
+        patterns: ["a2a-protocol"]
+      a2a-sdk-group: 
+        patterns: ["a2a-sdk"]
+      openinference-google-adk-group:
+        patterns: ["openinference-instrumentation-google-adk"]
+
+      # Security
+      pyjwt-group:
+        patterns: ["PyJWT", "pyjwt"]
+      python-multipart-group:
+        patterns: ["python-multipart"]
+      python-jose-group:
+        patterns: ["python-jose"]
+
+      # Utilities & Database
+      requests-group:
+        patterns: ["requests"]
+      pydantic-group:
+        patterns: ["pydantic"]
+      httpx-group:
+        patterns: ["httpx"]
+      qdrant-client-group:
+        patterns: ["qdrant-client"]
+      fastembed-group:
+        patterns: ["fastembed"]
+      langfuse-group:
+        patterns: ["langfuse"]
+      sqlalchemy-group:
+        patterns: ["sqlalchemy"]
+      psycopg2-group:
+        patterns: ["psycopg2-binary"]
+      alembic-group:
+        patterns: ["alembic"]
+        
