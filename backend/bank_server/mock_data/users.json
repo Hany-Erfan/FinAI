@@ -5,18 +5,18 @@
       "username": "admin",
       "full_name": "Admin User",
       "role": "admin",
-      "salt": "9dd9c05a80d45003",
-      "password": "admin_AgentixBuddy",
-      "password_hash": "198cef757c0a6e67e06c672f2f380c38b548dd80cbac8c626e8c16e9499e0ffe"
+      "salt": "3b43ec76404d933e",
+      "password": "admin_test",
+      "password_hash": "308550d777630c2d98b1314edac35451b85db997aff1c945b5e6d3a02c9f24bc"
     },
     {
       "user_id": "u-user-001",
       "username": "user",
       "full_name": "Standard User",
       "role": "user",
-      "salt": "204563efb538356c",
-      "password": "user_AgentixBuddy",
-      "password_hash": "c6498cd264cffaffeec5eb5c7d28fa8929c0fd6a0ddde614ebba0ed72821d4d9"
+      "salt": "963774057413c4f5",
+      "password": "user_test",
+      "password_hash": "0ced8e8f1a3532e76e1a874a6fc6323225e31aa7c8e7d5083d2cb69ca6605bd6"
     }
   ]
 }
