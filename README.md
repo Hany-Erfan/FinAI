@@ -1,6 +1,6 @@
-# AgentixBuddy: Multi-Agent AI Banking platform
+# FinAI: Multi-Agent AI Banking platform
 
-AgentixBuddy is a state-of-the-art, multi-agent AI banking platform designed to provide a seamless, secure, and intelligent customer support experience. Built with a modular microservices architecture, it leverages specialized AI agents to handle diverse banking tasks—from general inquiries to complex retail banking transactions.
+FinAI is a state-of-the-art, multi-agent AI banking platform designed to provide a seamless, secure, and intelligent customer support experience. Built with a modular microservices architecture, it leverages specialized AI agents to handle diverse banking tasks—from general inquiries to complex retail banking transactions.
 
 ---
 
@@ -42,7 +42,7 @@ graph TD
 
 ### Detailed Component Interaction
 
-AgentixBuddy follows a decoupled microservices pattern where each agent is an independent service:
+FinAI follows a decoupled microservices pattern where each agent is an independent service:
 
 ```mermaid
 sequenceDiagram
@@ -92,7 +92,7 @@ sequenceDiagram
 ### Setup
 1.  **Clone the repository**:
     ```bash
-    git clone https://github.com/innoagentix/customerbuddy.git
+    git clone https://github.com/intellagentix/customerbuddy.git
     cd customerbuddy
     ```
 
@@ -134,7 +134,7 @@ The platform is optimized for **GKE Autopilot**.
 
 ## 📊 Observability & Metrics
 
-AgentixBuddy uses **OpenTelemetry** for full-stack visibility.
+FinAI uses **OpenTelemetry** for full-stack visibility.
 - **Traces**: View the exact path of a message across all sub-agents in Grafana Tempo.
 - **Logs**: Centralized logging via Loki.
 - **Metrics**: Real-time performance dashboards in Grafana.

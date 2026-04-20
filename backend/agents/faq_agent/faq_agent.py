@@ -32,7 +32,7 @@ async def retrieve_product_info(user_query: str) -> str:
 def create_faq_agent(user_id: str) -> LlmAgent:
     """Constructs the ADK agent."""
     return LlmAgent(
-        model='gemini-3-flash-preview',
+        model=os.getenv("FAQ_AGENT_MODEL_ID", "gemini-1.5-flash-latest"),
         name='faq_agent',
         description='A bilingual FAQ assistant that answers questions about banking products using RAG.',
         instruction="""You are a specialized bilingual FAQ assistant. Your primary function is to answer user queries regarding banking products by strictly using the provided RAG tool to retrieve information.

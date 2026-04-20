@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: gateway-config
-  namespace: agentixbuddy
+  namespace: finai
 data:
   nginx.conf: |
     events {}
@@ -17,7 +17,7 @@ data:
 
         # ACME HTTP-01 challenge for Let's Encrypt (Must remain on HTTP)
         location /.well-known/acme-challenge/ {
-          proxy_pass http://acme-solver.agentixbuddy.svc.cluster.local:8089;
+          proxy_pass http://acme-solver.finai.svc.cluster.local:8089;
           proxy_set_header Host $host;
         }
 
@@ -30,7 +30,7 @@ data:
       # HTTPS Server
       server {
         listen 443 ssl;
-        server_name app.staging.agentixbuddy.com;
+        server_name app.staging.finai.com;
 
         ssl_certificate /etc/nginx/certs/tls.crt;
         ssl_certificate_key /etc/nginx/certs/tls.key;
@@ -46,7 +46,7 @@ data:
 
         # ACME HTTP-01 challenge for Let's Encrypt
         location /.well-known/acme-challenge/ {
-          proxy_pass http://acme-solver.agentixbuddy.svc.cluster.local:8089;
+          proxy_pass http://acme-solver.finai.svc.cluster.local:8089;
           proxy_set_header Host $host;
         }
 
@@ -118,7 +118,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: gateway
-  namespace: agentixbuddy
+  namespace: finai
 spec:
   replicas: 1
   selector:
@@ -148,13 +148,13 @@ spec:
             name: gateway-config
         - name: tls-certs
           secret:
-            secretName: agentixbuddy-tls
+            secretName: finai-tls
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: gateway
-  namespace: agentixbuddy
+  namespace: finai
 spec:
   type: LoadBalancer
   selector:

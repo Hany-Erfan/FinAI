@@ -15,9 +15,9 @@ import os
 HOST_AGENT_URL = os.getenv("HOST_AGENT_URL", "http://localhost:8000")
 
 ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD = "admin_AgentixBuddy"
+ADMIN_PASSWORD = "admin_FinAI"
 USER_USERNAME = "user"
-USER_PASSWORD = "user_AgentixBuddy"
+USER_PASSWORD = "user_FinAI"
 
 
 class TestSessionExplorer:

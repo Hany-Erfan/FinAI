@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: acme-solver
-  namespace: agentixbuddy
+  namespace: finai
 spec:
   ports:
   - port: 8089

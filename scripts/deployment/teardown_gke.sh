@@ -11,10 +11,10 @@ if [ -f .env ]; then
 fi
 
 # Configuration - can be overridden via .env or environment variables
-PROJECT_ID="${GCP_PROJECT_ID:-agentixbuddy-dev}"
+PROJECT_ID="${GCP_PROJECT_ID:-finai-dev}"
 REGION="${GCP_REGION:-europe-west3}"
-CLUSTER_NAME="${GKE_CLUSTER_NAME:-agentixbuddy-cluster}"
-STATIC_IP_NAME="${GKE_STATIC_IP_NAME:-agentixbuddy-ingress-ip}"
+CLUSTER_NAME="${GKE_CLUSTER_NAME:-finai-cluster}"
+STATIC_IP_NAME="${GKE_STATIC_IP_NAME:-finai-ingress-ip}"
 
 # Set DELETE_STATIC_IP=true to also delete the reserved IP address
 DELETE_STATIC_IP="${DELETE_STATIC_IP:-false}"

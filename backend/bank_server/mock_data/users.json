@@ -6,8 +6,8 @@
       "full_name": "Admin User",
       "role": "admin",
       "salt": "3b43ec76404d933e",
-      "password": "admin_test",
-      "password_hash": "308550d777630c2d98b1314edac35451b85db997aff1c945b5e6d3a02c9f24bc"
+      "password": "admin_FinAI",
+      "password_hash": "a0d147df6d1554da56ee53fff0c3cf48b03580a2f18a53af5413a7d677b60845"
     },
     {
       "user_id": "u-user-001",
@@ -15,8 +15,8 @@
       "full_name": "Standard User",
       "role": "user",
       "salt": "963774057413c4f5",
-      "password": "user_test",
-      "password_hash": "0ced8e8f1a3532e76e1a874a6fc6323225e31aa7c8e7d5083d2cb69ca6605bd6"
+      "password": "user_FinAI",
+      "password_hash": "9917a3f45fce7eae1bf02c0b0948413ff5c47b58997c313b9b202eb2dbeb45d4"
     }
   ]
 }

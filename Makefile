@@ -8,11 +8,11 @@ endif
 # ============================================
 # GCP Configuration (override via environment)
 # ============================================
-GCP_PROJECT_ID ?= agentixbuddy-dev
+GCP_PROJECT_ID ?= finai-dev
 GCP_REGION ?= europe-west3
-GCP_REPO ?= agentixbuddy-repo
-K8S_NAMESPACE ?= agentixbuddy
-GKE_CLUSTER_NAME ?= agentixbuddy-cluster
+GCP_REPO ?= finai-repo
+K8S_NAMESPACE ?= finai
+GKE_CLUSTER_NAME ?= finai-cluster
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'

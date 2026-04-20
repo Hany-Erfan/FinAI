@@ -5,13 +5,13 @@ import os
 # Base URLs for services
 HOST_AGENT_URL = os.getenv("HOST_AGENT_URL", "http://localhost:8000")
 VECTOR_DB_URL = os.getenv("VECTOR_DB_URL", "http://localhost:8004")
-TEST_DB_URL = os.getenv("DATABASE_URL", "postgresql://agentixBuddy:agentixsecret@postgres-db:5432/agentixBuddy")
+TEST_DB_URL = os.getenv("DATABASE_URL", "postgresql://finAI:finsecret@postgres-db:5432/finAI")
 
 # Test credentials
 ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD = "admin_AgentixBuddy"
+ADMIN_PASSWORD = "admin_FinAI"
 USER_USERNAME = "user"
-USER_PASSWORD = "user_AgentixBuddy"
+USER_PASSWORD = "user_FinAI"
 
 import uuid
 import pytest

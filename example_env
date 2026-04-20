@@ -39,8 +39,8 @@ JWT_ALG=HS256
 # DB Configuration
 # ============================
 
-POSTGRES_USER=agentixBuddy
+POSTGRES_USER=finAI
 POSTGRES_PASSWORD=secret
-POSTGRES_DB=agentixBuddy
+POSTGRES_DB=finAI
 
-DATABASE_URL=postgresql://agentixBuddy:secret@postgres-db:5432/agentixBuddy
+DATABASE_URL=postgresql://finAI:secret@postgres-db:5432/finAI

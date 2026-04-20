@@ -263,7 +263,7 @@ const ChatPage = ({ auth, onLogout, sessionId, inactivityTimeout }) => {
             <span></span>
             <span></span>
           </button>
-          <h2>AgentixBuddy</h2>
+          <h2>FinAI</h2>
           <div className="header-placeholder"></div>
            <div className="session-wrapper">
                 <button

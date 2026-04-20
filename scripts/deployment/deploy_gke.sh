@@ -50,11 +50,11 @@ fi
 # --- Cluster Configuration ---
 # ----------------------------
 # These can be overridden via .env or environment variables
-PROJECT_ID="${GCP_PROJECT_ID:-agentixbuddy-dev}"
+PROJECT_ID="${GCP_PROJECT_ID:-finai-dev}"
 REGION="${GCP_REGION:-europe-west3}"
-REPO="${GCP_REPO:-agentixbuddy-repo}"
-NAMESPACE="${K8S_NAMESPACE:-agentixbuddy}"
-CLUSTER_NAME="${GKE_CLUSTER_NAME:-agentixbuddy-cluster}"
+REPO="${GCP_REPO:-finai-repo}"
+NAMESPACE="${K8S_NAMESPACE:-finai}"
+CLUSTER_NAME="${GKE_CLUSTER_NAME:-finai-cluster}"
 
 # ----------------------------
 # --- GCloud Auth & Cluster ---
@@ -81,7 +81,7 @@ gcloud container clusters get-credentials $CLUSTER_NAME --region $REGION
 # ----------------------------
 # --- Reserve/Get Static IP for Ingress LoadBalancer ---
 # ----------------------------
-STATIC_IP_NAME="agentixbuddy-ingress-ip"
+STATIC_IP_NAME="finai-ingress-ip"
 if [ -z "$(gcloud compute addresses describe "$STATIC_IP_NAME" --region "$REGION" --format=json 2>/dev/null | jq -r '.address // empty')" ]; then
   echo "Static IP not found. Creating static IP: $STATIC_IP_NAME ..."
   # gcloud compute addresses create "$STATIC_IP_NAME" --region "$REGION"
@@ -100,7 +100,7 @@ if ! gcloud artifacts repositories describe $REPO --location=$REGION > /dev/null
   gcloud artifacts repositories create $REPO \
     --repository-format=docker \
     --location=$REGION \
-    --description="Docker repository for AgentixBuddy"
+    --description="Docker repository for FinAI"
 fi
 
 # Create Kubernetes namespace if it doesn't exist
@@ -276,10 +276,10 @@ echo "Deploying Gateway with static IP: $INGRESS_STATIC_IP"
 
 # Create a temporary dummy secret if it doesn't exist, to prevent Nginx crashing
 # before Let's Encrypt finishes provisioning the real certificate.
-if ! kubectl get secret agentixbuddy-tls -n $NAMESPACE >/dev/null 2>&1; then
+if ! kubectl get secret finai-tls -n $NAMESPACE >/dev/null 2>&1; then
   echo "Generating temporary bootstrapping TLS certificate..."
-  openssl req -x509 -nodes -days 1 -newkey rsa:2048 -keyout /tmp/tls.key -out /tmp/tls.crt -subj "/CN=temporary.agentixbuddy.com" >/dev/null 2>&1
-  kubectl create secret tls agentixbuddy-tls -n $NAMESPACE --key /tmp/tls.key --cert /tmp/tls.crt
+  openssl req -x509 -nodes -days 1 -newkey rsa:2048 -keyout /tmp/tls.key -out /tmp/tls.crt -subj "/CN=temporary.finai.com" >/dev/null 2>&1
+  kubectl create secret tls finai-tls -n $NAMESPACE --key /tmp/tls.key --cert /tmp/tls.crt
   rm /tmp/tls.key /tmp/tls.crt
 fi
 

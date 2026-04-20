@@ -8,7 +8,7 @@ from backend.common.cache_dict import SummaryAgentCache
 def create_summary_agent(user_id: str, session_id: str) -> LlmAgent:
     """Constructs the ADK agent."""
     return LlmAgent(
-        model='gemini-3-flash-preview',
+        model=os.getenv("SUMMARY_AGENT_MODEL_ID", "gemini-1.5-flash-latest"),
         name='summary_agent',
         description='Analyses the whole transcript and records structured summaries.',
         instruction=f"""

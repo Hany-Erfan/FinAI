@@ -45,7 +45,7 @@ services:
       - RETAIL_AGENT_URL=http://retail-agent:8002
       - SUMMARY_AGENT_URL=http://summary-agent:8003
       - BANK_URL=http://bank-server:8006
-      - DATABASE_URL=postgresql://agentixBuddy:agentixsecret@postgres-db:5432/agentixBuddy
+      - DATABASE_URL=postgresql://finAI:finsecret@postgres-db:5432/finAI
       - PORT=8000
       #      - GUARDRAILS_URL=http://guardrails-service:8005
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
@@ -58,6 +58,7 @@ services:
       - LOG_LOKI_ENDPOINT=lgtm:4317
       - LOG_SERVICE_NAME=host-agent
       - LOKI_URL=http://lgtm:3100
+      - HOST_AGENT_MODEL_ID=${HOST_AGENT_MODEL_ID}
     command: >
       uvicorn backend.host_agent.main:app --host 0.0.0.0 --port 8000 --reload --log-level debug
 
@@ -88,6 +89,7 @@ services:
       - OTEL_SERVICE_NAME=faq-agent
       - LOG_LOKI_ENDPOINT=lgtm:4317
       - LOG_SERVICE_NAME=faq-agent
+      - FAQ_AGENT_MODEL_ID=${FAQ_AGENT_MODEL_ID}
     command: >
       python -m uvicorn backend.agents.faq_agent.server:faq_app --host 0.0.0.0 --port 8001 --reload --log-level debug --use-colors
 
@@ -120,6 +122,7 @@ services:
       - OTEL_SERVICE_NAME=retail-agent
       - LOG_LOKI_ENDPOINT=lgtm:4317
       - LOG_SERVICE_NAME=retail-agent
+      - RETAIL_AGENT_MODEL_ID=${RETAIL_AGENT_MODEL_ID}
     command: >
       python -m uvicorn backend.agents.retail_agent.server:retail_app --host 0.0.0.0 --port 8002 --reload --log-level debug --use-colors
 
@@ -141,6 +144,7 @@ services:
       - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production-min-32-chars
       - JWT_EXPIRE_MINUTES=480
       - PORT=8003
+      - SUMMARY_AGENT_MODEL_ID=${SUMMARY_AGENT_MODEL_ID}
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
       - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL}
@@ -203,7 +207,7 @@ services:
       - UVICORN_LOG_LEVEL=debug
       - LOG_LEVEL=debug
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - DATABASE_URL=postgresql://agentixBuddy:agentixsecret@postgres-db:5432/agentixBuddy
+      - DATABASE_URL=postgresql://finAI:finsecret@postgres-db:5432/finAI
       - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production-min-32-chars
       - JWT_EXPIRE_MINUTES=480
       - PORT=8007
@@ -301,16 +305,16 @@ services:
     container_name: app_postgres
     restart: always
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-agentixBuddy}
-      POSTGRES_USER: ${POSTGRES_USER:-agentixBuddy}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agentixsecret}
+      POSTGRES_DB: ${POSTGRES_DB:-finAI}
+      POSTGRES_USER: ${POSTGRES_USER:-finAI}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-finsecret}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     entrypoint: [ "bash", "-c", "rm -f /var/lib/postgresql/data/postmaster.pid && docker-entrypoint.sh postgres" ]
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agentixBuddy} -d ${POSTGRES_DB:-agentixBuddy}" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-finAI} -d ${POSTGRES_DB:-finAI}" ]
       interval: 10s
       timeout: 5s
       retries: 5

@@ -11,7 +11,7 @@ from backend.common.cache_dict import RetailAgentCache
 def create_retail_agent(user_id: str) -> LlmAgent:
     """Constructs the ADK agent."""
     return LlmAgent(
-        model='gemini-2.5-flash',
+        model=os.getenv("RETAIL_AGENT_MODEL_ID", "gemini-1.5-flash-latest"),
         name='retail_agent',
         description='A retail banking assistant that helps customers with account information, balances, transactions, and product eligibility',
         instruction=f"""You are a specialized retail banking assistant for User ID: {user_id}. Your primary function is to help customers with their banking needs by utilizing the provided tools to retrieve and relay banking information in response to user queries.

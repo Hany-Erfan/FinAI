@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This guide explains how to deploy the **AgentixBuddy** application to Google Kubernetes Engine (GKE) Autopilot.
+This guide explains how to deploy the **FinAI** application to Google Kubernetes Engine (GKE) Autopilot.
 
 ---
 
@@ -40,17 +40,17 @@ The deployment is automated via the `scripts/deployment/deploy_gke.sh` script, w
 
 1.  **Authentication**: Logs you into Google Cloud (`gcloud auth login`).
 2.  **Cluster Provisioning**:
-    *   Checks if the cluster `agentixbuddy-cluster` exists.
+    *   Checks if the cluster `finai-cluster` exists.
     *   If not, creates a **GKE Autopilot** cluster in `europe-west3`.
 3.  **Static IP Reservation**:
-    *   Reserves a regional static IP named `agentixbuddy-ingress-ip` (if not already existing).
+    *   Reserves a regional static IP named `finai-ingress-ip` (if not already existing).
     *   This IP is used for the Gateway/LoadBalancer.
 4.  **Build & Push Images**:
     *   Builds Docker images for specific platforms (`linux/amd64`) to ensure compatibility with GKE.
     *   Images built: Frontend, Host Agent, FAQ Agent, Vector DB Service, Guardrails Service.
     *   Pushes all images to Google Artifact Registry.
 5.  **Infrastructure Setup**:
-    *   Creates namespace `agentixbuddy`.
+    *   Creates namespace `finai`.
     *   Deploys **Qdrant** vector database as a StatefulSet.
     *   Deploys **LGTM** observability stack (Grafana + Loki + Tempo) as a StatefulSet.
     *   Creates **ConfigMaps** from your local `.env` file.
@@ -75,7 +75,7 @@ The deployment is automated via the `scripts/deployment/deploy_gke.sh` script, w
 | :--- | :--- |
 | `make deploy-cluster` | Full cluster deployment to GKE (includes LGTM + dashboard upload). |
 | `make deploy-services` | Redeploy services only (keeps databases and LGTM). |
-| `make teardown-cluster` | **Destructive**. Deletes all resources in the `agentixbuddy` namespace and tears down the cluster to stop costs. |
+| `make teardown-cluster` | **Destructive**. Deletes all resources in the `finai` namespace and tears down the cluster to stop costs. |
 | `make deploy-status` | Shows status of Pods, Services, and Ingress in the cluster. |
 | `make deploy-logs` | Tails logs from all running pods in the cluster. |
 | `make deploy-cost-estimate` | Estimates monthly cost based on current pod resource usage. |
@@ -149,7 +149,7 @@ When you run `make deploy-cluster` on a fresh cluster:
 
 | Command | Description |
 | :--- | :--- |
-| `kubectl get certificate agentixbuddy-cert -n agentixbuddy -w` | Monitor the Let's Encrypt certificate provisioning status. Wait until `READY=True`. |
+| `kubectl get certificate finai-cert -n finai -w` | Monitor the Let's Encrypt certificate provisioning status. Wait until `READY=True`. |
 
 ---
 
@@ -158,7 +158,7 @@ When you run `make deploy-cluster` on a fresh cluster:
 *   **deployment script syntax error:** If editing scripts on Windows, ensure line endings are LF, not CRLF.
 *   **gcloud permission denied:** Run `gcloud auth login` and `gcloud auth application-default login`.
 *   **ImagePullBackOff:** Usually means the image wasn't pushed correctly or the cluster doesn't have permissions. The script handles auth, so try re-running the deployment.
-*   **Grafana not loading in production:** Ensure the LGTM pod is running (`kubectl get pods -n agentixbuddy -l app=lgtm`) and the gateway has the `/grafana/` route.
+*   **Grafana not loading in production:** Ensure the LGTM pod is running (`kubectl get pods -n finai -l app=lgtm`) and the gateway has the `/grafana/` route.
 
 ---
 

@@ -1,12 +1,12 @@
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: agentixbuddy-cert
-  namespace: agentixbuddy
+  name: finai-cert
+  namespace: finai
 spec:
-  secretName: agentixbuddy-tls
+  secretName: finai-tls
   issuerRef:
     name: letsencrypt-prod
     kind: ClusterIssuer
   dnsNames:
-  - app.staging.agentixbuddy.com
+  - app.staging.finai.com

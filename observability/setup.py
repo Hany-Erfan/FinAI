@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name="observability",
     version="1.0.0",
-    description="OpenTelemetry observability module for AgentixBuddy agents",
+    description="OpenTelemetry observability module for FinAI agents",
     packages=find_packages(),
     install_requires=[
         "pydantic>=2.10.0",
