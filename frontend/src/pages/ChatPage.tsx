@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { getMessages, sendChatMessage } from '../api/chat';
+import { getMessages, sendChatMessage, sendVoiceMessage } from '../api/chat';
 import { useNavigate } from 'react-router-dom';
 
 interface Message {
@@ -47,6 +47,9 @@ const ChatPage = ({ auth, onLogout, sessionId, inactivityTimeout }) => {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const chatInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const [currentUser, setCurrentUser] = useState<string | null>(localStorage.getItem('chatUser'));
 
   const scrollToBottom = () => {
@@ -182,6 +185,107 @@ const ChatPage = ({ auth, onLogout, sessionId, inactivityTimeout }) => {
     } finally {
       setIsLoading(false);
       chatInputRef.current?.focus();
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        await handleVoiceSend(audioBlob);
+        // Stop all tracks to release the microphone
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error("Error accessing microphone:", err);
+      alert("Could not access microphone. Please check permissions.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const playAudioResponse = (base64Audio: string) => {
+    try {
+      const audio = new Audio(`data:audio/mp3;base64,${base64Audio}`);
+      audio.play().catch(e => console.error("Error playing audio response:", e));
+    } catch (err) {
+      console.error("Error creating audio response:", err);
+    }
+  };
+
+  const handleVoiceSend = async (audioBlob: Blob) => {
+    if (isLoading) return;
+
+    const userMessage: Message = {
+      text: "🎤 Voice message...",
+      sender: 'user',
+      timestamp: new Date().toISOString(),
+    };
+
+    let currentSessionId = activeSessionId || sessionId;
+    if (!activeSessionId) {
+       setActiveSessionId(sessionId);
+    }
+
+    setSessions(prev => 
+      prev.map(s => s.id === currentSessionId ? { ...s, messages: [...s.messages, userMessage] } : s)
+    );
+    
+    setIsLoading(true);
+
+    try {
+      const result = await sendVoiceMessage(audioBlob, currentSessionId);
+      
+      const transcription = result?.user_message;
+      const reply = result?.response;
+      const audioBase64 = result?.audio_base64;
+
+      // Update the "Voice message" text with the actual transcription
+      setSessions(prev => prev.map(s => {
+        if (s.id === currentSessionId) {
+          const newMessages = [...s.messages];
+          if (transcription) {
+            newMessages[newMessages.length - 1].text = `🎤 ${transcription}`;
+          }
+          if (reply) {
+            newMessages.push({ text: reply, sender: 'agent', timestamp: new Date().toISOString() });
+          }
+          return { ...s, messages: newMessages };
+        }
+        return s;
+      }));
+
+      if (audioBase64) {
+        playAudioResponse(audioBase64);
+      }
+
+    } catch (error) {
+      console.error('Error sending voice message:', error);
+      const errorMessage: Message = { text: 'Error: Could not process voice message.', sender: 'agent', timestamp: new Date().toISOString() };
+      setSessions(prev => prev.map(s =>
+        s.id === currentSessionId ? { ...s, messages: [...s.messages, errorMessage] } : s
+      ));
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -349,6 +453,19 @@ const ChatPage = ({ auth, onLogout, sessionId, inactivityTimeout }) => {
               disabled={isLoading}
               rows={1}
             />
+            <button 
+              className={`mic-btn ${isRecording ? 'recording' : ''}`} 
+              onClick={isRecording ? stopRecording : startRecording}
+              disabled={isLoading}
+              title={isRecording ? "Stop Recording" : "Record Voice Message"}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" fill="currentColor"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
             <button className="send-btn" onClick={handleSend} disabled={!input.trim() || isLoading}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M7 11L12 6L17 11M12 18V7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />

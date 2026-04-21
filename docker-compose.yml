@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   frontend:
     build:
@@ -59,6 +57,7 @@ services:
       - LOG_SERVICE_NAME=host-agent
       - LOKI_URL=http://lgtm:3100
       - HOST_AGENT_MODEL_ID=${HOST_AGENT_MODEL_ID}
+      - VOICE_SERVICE_URL=${VOICE_SERVICE_URL}
     command: >
       uvicorn backend.host_agent.main:app --host 0.0.0.0 --port 8000 --reload --log-level debug
 
@@ -247,6 +246,27 @@ services:
       - LOG_SERVICE_NAME=vector-db-service
     command: >
       python -m uvicorn backend.services.vector_db_service.server:vector_db_app --host 0.0.0.0 --port 8004 --reload --log-level debug --use-colors
+
+  voice-service:
+    build:
+      context: .
+      dockerfile: backend/services/voice_service/Dockerfile
+    container_name: voice-service
+    ports:
+      - "8008:8008"
+    volumes:
+      - ./backend:/app/backend
+    environment:
+      - PYTHONUNBUFFERED=1
+      - UVICORN_LOG_LEVEL=debug
+      - LOG_LEVEL=debug
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - VOICE_STT_MODEL_ID=${VOICE_STT_MODEL_ID}
+      - VOICE_TTS_EN_VOICE=${VOICE_TTS_EN_VOICE}
+      - VOICE_TTS_AR_VOICE=${VOICE_TTS_AR_VOICE}
+      - PORT=8008
+    command: >
+      python -m uvicorn backend.services.voice_service.server:voice_db_app --host 0.0.0.0 --port 8008 --reload --log-level debug --use-colors
 
   #  guardrails-service:
   #    build:

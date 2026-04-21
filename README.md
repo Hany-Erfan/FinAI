@@ -6,7 +6,10 @@ FinAI is a state-of-the-art, multi-agent AI banking platform designed to provide
 
 ## 🚀 Key Features
 
-*   **Orchestrated Multi-Agent System**: A central "Host Agent" intelligently routes requests to specialized sub-agents based on user intent.
+*   **Premium Voice Interaction**: 
+    *   **Speech-to-Text (STT)**: Real-time transcription using Gemini-powered audio processing.
+    *   **Ultra-High-Fidelity TTS**: Leverages Google's latest generative **Journey** (English) and **Chirp3-HD** (Arabic) models for near-human quality.
+    *   **Egyptian Dialect Support**: Features full dialect mirroring and localized vocal synthesis for an authentic user experience.
 *   **Intelligent Banking Support**:
     *   **FAQ Agent**: Uses RAG (Retrieval-Augmented Generation) with a vector database to provide instant, accurate answers to general banking questions.
     *   **Retail Agent**: Integrates with banking APIs to facilitate account management and transactions (simulated via Mock Bank Server).
@@ -23,9 +26,14 @@ FinAI is a state-of-the-art, multi-agent AI banking platform designed to provide
 
 ```mermaid
 graph TD
-    Client["Client (Frontend)"] -->|HTTPS| Gateway["Nginx Gateway"]
+    Client["Client (Frontend)"] -->|Audio/Text| Gateway["Nginx Gateway"]
     Gateway --> HostAgent["Host Agent (Orchestrator)"]
     
+    subgraph Voice Interaction
+        HostAgent --> VoiceService["Voice Service (STT/TTS)"]
+        VoiceService --> GoogleCloud["Google Cloud TTS/Gemini"]
+    end
+
     subgraph Sub-Agents
         HostAgent --> FAQAgent["FAQ Agent (RAG)"]
         HostAgent --> RetailAgent["Retail Agent (Banking)"]
@@ -49,22 +57,29 @@ sequenceDiagram
     participant U as User
     participant F as Frontend
     participant H as Host Agent
-    participant G as Guardrails
+    participant V as Voice Service
     participant S as Sub-Agents
     participant O as LGTM Stack
 
-    U->>F: Submit Request
-    F->>H: Forward Request
-    H->>G: Verify Intent & Safety
-    G-->>H: Safe to Proceed
+    U->>F: Speak/Type Request
+    F->>H: Forward Audio/Text
+    alt is Audio
+        H->>V: Transcribe (STT)
+        V-->>H: Text Message
+    end
     H->>S: Delegate to Specialized Agent
     S-->>H: Return Response
+    alt is Voice Mode
+        H->>V: Synthesize (TTS)
+        V-->>H: Audio File (Base64)
+    end
     H->>F: Send Final Answer
-    F->>U: Display Response
+    F->>U: Display & Play Response
     
     rect rgb(240, 240, 240)
     Note over H, O: Async Observability
     H->>O: Push Traces & Logs
+    V->>O: Push Traces & Logs
     S->>O: Push Traces & Logs
     end
 ```
@@ -75,6 +90,7 @@ sequenceDiagram
 
 *   **Frontend**: React, Vite, TypeScript, TailwindCSS.
 *   **Backend**: Python, FastAPI, LangChain, Pydantic.
+*   **Voice**: Google Cloud Text-to-Speech (Chirp3-HD, Journey, Neural2), Gemini Audio (STT), SSML Rhythm Tuning.
 *   **AI/LLM**: Google Gemini, OpenAI (configurable).
 *   **Databases**: Qdrant (Vector), PostgreSQL (Relational).
 *   **Observability**: Grafana, Loki, Tempo (OpenTelemetry).
@@ -97,10 +113,15 @@ sequenceDiagram
     ```
 
 2.  **Environment Variables**:
-    Copy the example env files and fill in your API keys (e.g., `GOOGLE_API_KEY`).
+    Copy the example env files and fill in your API keys.
     ```bash
     cp .env.example .env
-    cp .env.secrets.example .env.secrets
+    ```
+    Ensure the following voice configs are set for the best experience:
+    ```env
+    GOOGLE_API_KEY=your_key
+    VOICE_TTS_EN_VOICE=en-US-Journey-F
+    VOICE_TTS_AR_VOICE=ar-XA-Chirp3-HD-Kore
     ```
 
 3.  **Spin up the stack**:

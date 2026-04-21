@@ -13,7 +13,7 @@ from backend.postgres_db.database import get_db, init_db
 from backend.postgres_db.models import MessageRole
 from backend.postgres_db.repository import SessionRepository
 import uvicorn
-from fastapi import FastAPI, HTTPException, Depends, Request, Response, status
+from fastapi import FastAPI, HTTPException, Depends, Request, Response, status, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 from pydantic import BaseModel
@@ -56,6 +56,9 @@ BANK_URL = os.getenv("BANK_URL", "http://localhost:8006")
 # Guardrails service configuration
 GUARDRAILS_URL = os.getenv("GUARDRAILS_URL", "http://localhost:8005")
 
+# Voice service configuration
+VOICE_SERVICE_URL = os.getenv("VOICE_SERVICE_URL", "http://localhost:8008")
+
 # Defaults (reference-style)
 DEFAULT_USER_ID = "default_user"
 DEFAULT_SESSION_ID = "default_session"
@@ -94,6 +97,12 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     response: str
+    status: str = "completed"
+
+class VoiceChatResponse(BaseModel):
+    user_message: str
+    response: str
+    audio_base64: Optional[str] = None
     status: str = "completed"
 
 class LoginRequest(BaseModel):
@@ -345,6 +354,13 @@ async def chat_endpoint(
         lang = detect_language(request.message or "")
         session_id = request.session_id
 
+        # 0) Ensure session exists in DB
+        repo.create_session(
+            user_id=current_user["user_id"],
+            user_name=current_user["username"],
+            session_id=session_id,
+        )
+
         # 1) Mask user's message before DB storage 
         masked_user_message = repo.masker.mask(request.message)
         repo.save_message(
@@ -459,6 +475,115 @@ async def chat_endpoint(
 
     except Exception as e:
         logger.exception(f"Error in chat endpoint: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+@app.post("/voice_chat", response_model=VoiceChatResponse, tags=["Chat"])
+async def voice_chat_endpoint(
+    audio: UploadFile = File(...),
+    session_id: str = Form(...),
+    current_user=Depends(get_current_user),
+    repo = Depends(get_chat_respository)
+):
+    try:
+        # 1) Speech-to-Text: Convert audio to text
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            stt_response = await client.post(
+                f"{VOICE_SERVICE_URL}/voice_service/stt",
+                files={"audio": (audio.filename, await audio.read(), audio.content_type)}
+            )
+            stt_response.raise_for_status()
+            stt_data = stt_response.json()
+            user_message = stt_data.get("text")
+            logger.info(f"[VOICE] Transcription received for session {session_id}: '{user_message}'")
+
+        if not user_message:
+            # If transcription is empty but succeeded (silence), we can just return early or log it.
+            return VoiceChatResponse(
+                user_message="",
+                response=".عذراً، لم أستطع سماع أي شيء. يرجى المحاولة مرة أخرى" if detect_language("") == "ar" else "I'm sorry, I couldn't hear anything. Please try again.",
+                status="completed"
+            )
+
+        # 2) Ensure session exists in DB and ADK memory
+        repo.create_session(
+            user_id=current_user["user_id"],
+            user_name=current_user["username"],
+            session_id=session_id,
+        )
+
+        session = await SESSION_SERVICE.get_session(
+            app_name=APP_NAME,
+            user_id=current_user["user_id"],
+            session_id=session_id,
+        )
+
+        current_request_state = {
+            "user_id": current_user["user_id"],
+            "username": current_user["username"],
+            "session_id": session_id
+        }
+
+        if not session:
+            logger.info(f"Creating new ADK session for Voice with id '{session_id}'")
+            await SESSION_SERVICE.create_session(
+                app_name=APP_NAME,
+                user_id=current_user["user_id"],
+                session_id=session_id,
+                state=current_request_state or {},
+            )
+        else:
+            try:
+                actions = EventActions(state_delta=current_request_state)
+                event = Event(
+                    invocation_id="voice_bridge_state_update",
+                    author="host_agent_voice",
+                    actions=actions,
+                )
+                await SESSION_SERVICE.append_event(session, event)
+            except Exception as exc:
+                logger.warning(f"[VOICE-DEBUG] Failed to append session state: {exc}")
+
+        # 3) Process with Agent
+        
+        # Log user message
+        repo.save_message(
+            session_id=session_id,
+            role=MessageRole.USER,
+            content=f"[VOICE] {user_message}",
+        )
+
+        # Get agent response
+        response_text = await get_response_from_agent(
+            user_message, user_id=current_user["user_id"], session_id=session_id
+        )
+
+        # 4) Text-to-Speech: Convert response to audio
+        lang_code = detect_language(response_text)
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            tts_response = await client.post(
+                f"{VOICE_SERVICE_URL}/voice_service/tts",
+                json={"text": response_text, "language_code": lang_code}
+            )
+            tts_response.raise_for_status()
+            tts_data = tts_response.json()
+            audio_base64 = tts_data.get("audio_base64")
+
+        # Log agent response
+        repo.save_message(
+            session_id=session_id,
+            role=MessageRole.MODEL,
+            content=f"[VOICE] {response_text}",
+        )
+
+        return VoiceChatResponse(
+            user_message=user_message,
+            response=response_text,
+            audio_base64=audio_base64,
+            status="completed"
+        )
+
+    except Exception as e:
+        logger.exception(f"Error in voice_chat endpoint: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 # =========================
 # Startup Hook

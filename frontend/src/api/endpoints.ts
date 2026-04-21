@@ -21,4 +21,5 @@ export const Endpoints = {
   ADMIN_SESSION_DETAIL: (id: string) => `${API_BASE}/admin/sessions/${id}`,
   ADMIN_ANALYTICS: (start: string, end: string) =>
     `${API_BASE}/admin/analytics?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
+  VOICE_CHAT: `${API_BASE}/voice_chat`,
 } as const;

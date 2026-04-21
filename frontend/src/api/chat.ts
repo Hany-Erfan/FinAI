@@ -37,3 +37,27 @@ export async function getMessages(sessionId) {
   }
   return response.json();
 }
+
+export async function sendVoiceMessage(audioBlob, sessionId) {
+  const formData = new FormData();
+  formData.append("audio", audioBlob, "recording.wav");
+  formData.append("session_id", sessionId);
+  formData.append("user_id", localStorage.getItem("chatUser") || "test_user");
+
+  const response = await fetch(`${Endpoints.VOICE_CHAT}`, {
+    method: "POST",
+    headers: {
+      ...sessionHeaders(sessionId),
+      ...csrfHeaders(sessionId),
+    },
+    credentials: "include",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: "Voice chat error" }));
+    throw new Error(err.detail || "Voice chat error");
+  }
+
+  return response.json();
+}
