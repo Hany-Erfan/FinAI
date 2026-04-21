@@ -91,14 +91,14 @@ The deployment is automated via the `scripts/deployment/deploy_gke.sh` script, w
 
 | Command | Description |
 | :--- | :--- |
-| `make up` | Starts the full stack locally (without monitoring). |
+| `make up` | Starts the full stack locally (including monitoring). |
 | `make down` | Stops containers and removes volumes. |
 | `make logs` | Follows logs for all local services. |
 | `make status` | Shows running local containers (`docker-compose ps`). |
 
-To start with the monitoring stack locally:
+To initialize the monitoring stack locally:
 ```bash
-docker-compose --profile monitor up -d
+make up
 make upload-dashboard
 ```
 

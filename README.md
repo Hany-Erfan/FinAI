@@ -92,8 +92,8 @@ sequenceDiagram
 ### Setup
 1.  **Clone the repository**:
     ```bash
-    git clone https://github.com/intellagentix/customerbuddy.git
-    cd customerbuddy
+    git clone https://github.com/Hany-Erfan/FinAI.git
+    cd FinAI
     ```
 
 2.  **Environment Variables**:
@@ -112,7 +112,7 @@ sequenceDiagram
 4.  **Access the Application**:
     - **Frontend**: `http://localhost:5173`
     - **Host Agent API**: `http://localhost:8000`
-    - **Grafana**: `http://localhost:3000` (optional profile: `make up monitor`)
+    - **Grafana**: `http://localhost:3000`
 
 ---
 
