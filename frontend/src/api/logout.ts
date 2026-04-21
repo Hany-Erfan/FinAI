@@ -13,8 +13,8 @@ export async function logout(sessionId) {
 }
 
 
-export function summary(sessionId) {
-  fetch(`${Endpoints.SUMMARY}`, {
+export async function summary(sessionId) {
+  return fetch(`${Endpoints.SUMMARY}`, {
     method: "POST",
     headers: {
       ...sessionHeaders(sessionId),
