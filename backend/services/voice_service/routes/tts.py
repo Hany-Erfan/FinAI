@@ -37,7 +37,7 @@ def wrap_ssml(text: str, language_code: str) -> str:
         return f"<speak><prosody rate='105%' pitch='+1st'>{ssml_text}</prosody></speak>"
     else:
         # English naturalization: Standard pace
-        return f"<speak><prosody rate='100%' pitch='0st'>{ssml_text}</prosody></speak>"
+        return f"<speak><prosody rate='110%' pitch='0st'>{ssml_text}</prosody></speak>"
 
 @tts_router.post("/tts")
 async def text_to_speech(request: TTSRequest):
