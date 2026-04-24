@@ -19,7 +19,7 @@ if GOOGLE_API_KEY:
 @stt_router.post("/stt")
 async def speech_to_text(audio: UploadFile = File(...)):
     """
-    Converts audio file to text using Gemini 1.5 Flash.
+    Converts audio file to text using Gemini 2.5 Pro.
     """
     try:
         content = await audio.read()
@@ -30,7 +30,7 @@ async def speech_to_text(audio: UploadFile = File(...)):
             return {"status": "error", "message": "API Key not configured"}
 
         # Initialize model
-        stt_model_id = os.getenv("VOICE_STT_MODEL_ID", "gemini-1.5-flash-latest")
+        stt_model_id = os.getenv("VOICE_STT_MODEL_ID", "gemini-3-flash-preview")
         model = genai.GenerativeModel(stt_model_id)
         
         # Prepare the audio part
@@ -48,10 +48,26 @@ async def speech_to_text(audio: UploadFile = File(...)):
         ]
 
         # Call Gemini to transcribe
-        response = model.generate_content([
-            "Please transcribe the following audio accurately. Just return the verbatim transcript without any conversational filler or extra text. If the audio is in Arabic, provide the Arabic transcript. If English, provide English. If you hear no speech, return an empty string.",
-            audio_part
-        ], safety_settings=safety_settings)
+        max_retries = 4
+        base_delay = 1.0
+        response = None
+        for attempt in range(max_retries + 1):
+            try:
+                response = model.generate_content([
+                    "Please transcribe the following audio accurately. Just return the verbatim transcript without any conversational filler or extra text. If the audio is in Arabic, provide the Arabic transcript. If English, provide English. If you hear no speech, return an empty string.",
+                    audio_part
+                ], safety_settings=safety_settings)
+                break
+            except Exception as e:
+                error_str = str(e)
+                is_503 = "503" in error_str or "UNAVAILABLE" in error_str or "temporarily overloaded" in error_str.lower()
+                if is_503 and attempt < max_retries:
+                    import asyncio
+                    delay = base_delay * (2 ** attempt)
+                    logger.warning(f"503 UNAVAILABLE in STT. Retrying in {delay}s... (Attempt {attempt + 1}/{max_retries})")
+                    await asyncio.sleep(delay)
+                    continue
+                raise
         
         # Defensive check for response text
         transcription = ""

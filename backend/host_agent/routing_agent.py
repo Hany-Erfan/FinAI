@@ -182,7 +182,7 @@ class RoutingAgent:
         :rtype: Agent
         """
         return Agent(
-            model=os.getenv("HOST_AGENT_MODEL_ID", "gemini-1.5-flash-latest"),
+            model=os.getenv("HOST_AGENT_MODEL_ID", "gemini-3-flash-preview"),
             name="Routing_agent",
             instruction=self.root_instruction,
             before_model_callback=self.before_model_callback,

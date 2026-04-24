@@ -86,41 +86,58 @@ class SummaryExecutor(AgentExecutor):
         self._active_sessions.add(session_id)
 
         try:
-            async for event in summary_agent.runner.run_async(
-                session_id=session_id,
-                user_id=user_id,
-                new_message=new_message,
-            ):
-                if event.is_final_response():
-                    parts = [
-                        convert_genai_part_to_a2a(part)
-                        for part in event.content.parts
-                        if (part.text or part.file_data or part.inline_data)
-                    ]
-                    logger.debug('Yielding final response: %s', parts)
-                    await task_updater.add_artifact(parts)
-                    await task_updater.update_status(
-                        TaskState.completed, final=True
-                    )
-                    break
-                if not event.get_function_calls():
-                    logger.debug('Yielding update response')
-                    await task_updater.update_status(
-                        TaskState.working,
-                        message=task_updater.new_agent_message(
-                            [
+            max_retries = 4
+            base_delay = 1.0
+            
+            for attempt in range(max_retries + 1):
+                try:
+                    async for event in summary_agent.runner.run_async(
+                        session_id=session_id,
+                        user_id=user_id,
+                        new_message=new_message,
+                    ):
+                        if event.is_final_response():
+                            parts = [
                                 convert_genai_part_to_a2a(part)
                                 for part in event.content.parts
-                                if (
-                                    part.text
-                                    or part.file_data
-                                    or part.inline_data
-                                )
-                            ],
-                        ),
-                    )
-                else:
-                    logger.debug('Skipping event')
+                                if (part.text or part.file_data or part.inline_data)
+                            ]
+                            logger.debug('Yielding final response: %s', parts)
+                            await task_updater.add_artifact(parts)
+                            await task_updater.update_status(
+                                TaskState.completed, final=True
+                            )
+                            break
+                        if not event.get_function_calls():
+                            logger.debug('Yielding update response')
+                            await task_updater.update_status(
+                                TaskState.working,
+                                message=task_updater.new_agent_message(
+                                    [
+                                        convert_genai_part_to_a2a(part)
+                                        for part in event.content.parts
+                                        if (
+                                            part.text
+                                            or part.file_data
+                                            or part.inline_data
+                                        )
+                                    ],
+                                ),
+                            )
+                        else:
+                            logger.debug('Skipping event')
+                    break
+                except Exception as e:
+                    error_str = str(e)
+                    is_503 = "503" in error_str or "UNAVAILABLE" in error_str or "temporarily overloaded" in error_str.lower()
+                    
+                    if is_503 and attempt < max_retries:
+                        import asyncio
+                        delay = base_delay * (2 ** attempt)
+                        logger.warning(f"503 UNAVAILABLE encountered. Retrying in {delay} seconds... (Attempt {attempt + 1}/{max_retries})")
+                        await asyncio.sleep(delay)
+                        continue
+                    raise
         finally:
             # Remove from active sessions when done
             self._active_sessions.discard(session_id)

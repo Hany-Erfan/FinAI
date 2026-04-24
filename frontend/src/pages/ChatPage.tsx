@@ -57,7 +57,7 @@ const ChatPage = ({ auth, onLogout, sessionId, inactivityTimeout }) => {
   };
 
   useEffect(() => {
-    scrollToBottom(); 
+    scrollToBottom();
   }, [sessions, activeSessionId, isLoading]);
 
   useEffect(() => {
@@ -92,23 +92,23 @@ const ChatPage = ({ auth, onLogout, sessionId, inactivityTimeout }) => {
   useEffect(() => {
     if (!sessionId) return;
 
-      async function loadMessages() {
-        try {
-          const data: Message[] = await getMessages(sessionId);
-          
-          setSessions(prev => {
-            const exists = prev.find(s => s.id === sessionId);
-            if (exists) {
-              // update existing session messages
-              return prev.map(s => s.id === sessionId ? { ...s, messages: data } : s);
-            }
-            // session doesn't exist yet, create it
-            return [{ id: sessionId, title: "", messages: data }, ...prev];
-          });
-        } catch (err) {
-          console.error("Failed to load messages:", err);
-        }
+    async function loadMessages() {
+      try {
+        const data: Message[] = await getMessages(sessionId);
+
+        setSessions(prev => {
+          const exists = prev.find(s => s.id === sessionId);
+          if (exists) {
+            // update existing session messages
+            return prev.map(s => s.id === sessionId ? { ...s, messages: data } : s);
+          }
+          // session doesn't exist yet, create it
+          return [{ id: sessionId, title: "", messages: data }, ...prev];
+        });
+      } catch (err) {
+        console.error("Failed to load messages:", err);
       }
+    }
 
     loadMessages();
   }, []);
@@ -243,18 +243,18 @@ const ChatPage = ({ auth, onLogout, sessionId, inactivityTimeout }) => {
 
     let currentSessionId = activeSessionId || sessionId;
     if (!activeSessionId) {
-       setActiveSessionId(sessionId);
+      setActiveSessionId(sessionId);
     }
 
-    setSessions(prev => 
+    setSessions(prev =>
       prev.map(s => s.id === currentSessionId ? { ...s, messages: [...s.messages, userMessage] } : s)
     );
-    
+
     setIsLoading(true);
 
     try {
       const result = await sendVoiceMessage(audioBlob, currentSessionId);
-      
+
       const transcription = result?.user_message;
       const reply = result?.response;
       const audioBase64 = result?.audio_base64;
@@ -369,29 +369,29 @@ const ChatPage = ({ auth, onLogout, sessionId, inactivityTimeout }) => {
           </button>
           <h2>FinAI</h2>
           <div className="header-placeholder"></div>
-           <div className="session-wrapper">
-                <button
-                  id="session-btn"
-                  className="session-btn"
-                  onClick={() => document.getElementById('session-popover')?.classList.toggle('open')}
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+          <div className="session-wrapper">
+            <button
+              id="session-btn"
+              className="session-btn"
+              onClick={() => document.getElementById('session-popover')?.classList.toggle('open')}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
                 stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                <line x1="12" y1="9" x2="12" y2="13"/>
-                <line x1="12" y1="17" x2="12.01" y2="17"/>
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
               </svg> Session security
-                </button>
-                <div id="session-popover" className="session-popover">
-                  <div className="session-popover-arrow" />
-                  <strong style={{ color: "#111827", display: "block", marginBottom: "4px" }}>
-                    ⚠️ Auto logout enabled
-                    </strong>
-                    For your security, your session will automatically expire after{" "}
-                    <strong>{INACTIVITY_MINUTES} minutes</strong> of inactivity.
-                    Any unsaved progress will be lost.
-                </div>
-              </div>
+            </button>
+            <div id="session-popover" className="session-popover">
+              <div className="session-popover-arrow" />
+              <strong style={{ color: "#111827", display: "block", marginBottom: "4px" }}>
+                ⚠️ Auto logout enabled
+              </strong>
+              For your security, your session will automatically expire after{" "}
+              <strong>{INACTIVITY_MINUTES} minutes</strong> of inactivity.
+              Any unsaved progress will be lost.
+            </div>
+          </div>
         </div>
         <div className="chat-body">
           <div className="chat-messages">
@@ -453,17 +453,17 @@ const ChatPage = ({ auth, onLogout, sessionId, inactivityTimeout }) => {
               disabled={isLoading}
               rows={1}
             />
-            <button 
-              className={`mic-btn ${isRecording ? 'recording' : ''}`} 
+            <button
+              className={`mic-btn ${isRecording ? 'recording' : ''}`}
               onClick={isRecording ? stopRecording : startRecording}
               disabled={isLoading}
               title={isRecording ? "Stop Recording" : "Record Voice Message"}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" fill="currentColor"/>
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" fill="currentColor" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
             <button className="send-btn" onClick={handleSend} disabled={!input.trim() || isLoading}>

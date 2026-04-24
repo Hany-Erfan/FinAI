@@ -5,6 +5,7 @@ import os
 import base64
 from google.cloud import texttospeech
 from google.api_core.client_options import ClientOptions
+import google.generativeai as genai
 
 logger = logging.getLogger(__name__)
 
@@ -17,19 +18,29 @@ class TTSRequest(BaseModel):
     text: str
     language_code: str = "en-US" # Default to en-US
 
+import re
+
 def wrap_ssml(text: str, language_code: str) -> str:
     """
     Wraps plain text in SSML tags to add natural rhythm.
     Adds pauses after punctuation and slight pitch/rate adjustments.
     """
+    # Clean up markdown for TTS to prevent pronouncing "asterisk" or "hash"
+    # Remove bold/italic asterisks and header hashes globally
+    clean_text = re.sub(r'[*#]', '', text)
+    # Remove bullet points (dash or plus followed by a space at start of lines)
+    clean_text = re.sub(r'^\s*[-+]\s+', '', clean_text, flags=re.MULTILINE)
+    
     # Escaping special characters for SSML
-    ssml_text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    ssml_text = clean_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     
     # Add natural pauses after periods and commas
     ssml_text = ssml_text.replace(". ", ". <break time='400ms'/>")
     ssml_text = ssml_text.replace("? ", "? <break time='500ms'/>")
     ssml_text = ssml_text.replace("! ", "! <break time='500ms'/>")
     ssml_text = ssml_text.replace(", ", ", <break time='200ms'/>")
+    # Also add a pause for newlines to separate bullet points better
+    ssml_text = ssml_text.replace("\n", " <break time='400ms'/>\n")
     
     # Language-specific tuning
     if "ar" in language_code.lower():
@@ -51,6 +62,10 @@ async def text_to_speech(request: TTSRequest):
         if not GOOGLE_API_KEY:
             logger.error("GOOGLE_API_KEY not set")
             return {"status": "error", "message": "API Key not configured"}
+
+        # We now instruct the host_agent to output conversational, flowing text without markdown natively.
+        # This completely eliminates the 24-second delay of rewriting text with Gemini in the TTS pipeline.
+        spoken_text = request.text
 
         # Initialize the client with API Key
         client_options = ClientOptions(api_key=GOOGLE_API_KEY)
@@ -79,7 +94,7 @@ async def text_to_speech(request: TTSRequest):
             voice_name = en_voice_name
 
         # Wrap text in SSML for naturalness
-        ssml_content = wrap_ssml(request.text, target_lang)
+        ssml_content = wrap_ssml(spoken_text, target_lang)
         synthesis_input = texttospeech.SynthesisInput(ssml=ssml_content)
 
         voice = texttospeech.VoiceSelectionParams(

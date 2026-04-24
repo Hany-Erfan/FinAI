@@ -206,34 +206,48 @@ async def get_response_from_agent(message: str, user_id: str, session_id: str) -
     if ROUTING_AGENT_RUNNER is None:
         return "Error: Agent not initialized yet. Please wait for startup to complete."
 
-    try:
-        event_iterator = ROUTING_AGENT_RUNNER.run_async(
-            user_id=user_id,
-            session_id=session_id,
-            new_message=types.Content(role="user", parts=[types.Part(text=message)]),
-        )
+    max_retries = 4
+    base_delay = 1.0
 
-        final_response_text = ""
-        async for event in event_iterator:
-            log_tool_calls_and_responses(event)
+    for attempt in range(max_retries + 1):
+        try:
+            event_iterator = ROUTING_AGENT_RUNNER.run_async(
+                user_id=user_id,
+                session_id=session_id,
+                new_message=types.Content(role="user", parts=[types.Part(text=message)]),
+            )
 
-            if event.is_final_response():
-                if event.content and event.content.parts:
-                    final_response_text = "".join(
-                        [p.text for p in event.content.parts if getattr(p, "text", None)]
-                    ).strip()
-                elif event.actions and getattr(event.actions, "escalate", None):
-                    final_response_text = (
-                        f"Agent escalated: {getattr(event, 'error_message', None) or 'No specific message.'}"
-                    )
-                # DON'T break; consume rest of stream (reference behavior)
+            final_response_text = ""
+            async for event in event_iterator:
+                log_tool_calls_and_responses(event)
 
-        return final_response_text if final_response_text else "No response from agent."
+                if event.is_final_response():
+                    if event.content and event.content.parts:
+                        final_response_text = "".join(
+                            [p.text for p in event.content.parts if getattr(p, "text", None)]
+                        ).strip()
+                    elif event.actions and getattr(event.actions, "escalate", None):
+                        final_response_text = (
+                            f"Agent escalated: {getattr(event, 'error_message', None) or 'No specific message.'}"
+                        )
+                    # DON'T break; consume rest of stream (reference behavior)
 
-    except Exception as e:
-        logger.info(f"Error in get_response_from_agent (Type: {type(e)}): {e}")
-        traceback.print_exc()
-        return f"An error occurred while processing your request: {str(e)}"
+            return final_response_text if final_response_text else "No response from agent."
+
+        except Exception as e:
+            error_str = str(e)
+            is_503 = "503" in error_str or "UNAVAILABLE" in error_str or "temporarily overloaded" in error_str.lower()
+            
+            if is_503 and attempt < max_retries:
+                import asyncio
+                delay = base_delay * (2 ** attempt)  # 1s, 2s, 4s, 8s
+                logger.warning(f"503 UNAVAILABLE encountered. Retrying in {delay} seconds... (Attempt {attempt + 1}/{max_retries})")
+                await asyncio.sleep(delay)
+                continue
+                
+            logger.info(f"Error in get_response_from_agent (Type: {type(e)}): {e}")
+            traceback.print_exc()
+            return f"An error occurred while processing your request: {error_str}"
 
 def get_chat_respository(db = Depends(get_db)) -> SessionRepository:
     return SessionRepository(db = db, masker= DataMasker())
@@ -486,7 +500,7 @@ async def voice_chat_endpoint(
 ):
     try:
         # 1) Speech-to-Text: Convert audio to text
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=120.0) as client:
             stt_response = await client.post(
                 f"{VOICE_SERVICE_URL}/voice_service/stt",
                 files={"audio": (audio.filename, await audio.read(), audio.content_type)}
@@ -552,14 +566,21 @@ async def voice_chat_endpoint(
             content=f"[VOICE] {user_message}",
         )
 
+        # Inject a system prompt note to ensure the agent outputs natural, flowing text suitable for TTS
+        voice_instruction = (
+            " [Note: This is a voice conversation. Please respond in a natural, conversational, human-like flow. "
+            "Do NOT use bullet points, numbered lists, asterisks, hashes, or any markdown formatting. Speak in full, flowing sentences.]"
+        )
+        augmented_message = user_message + voice_instruction
+
         # Get agent response
         response_text = await get_response_from_agent(
-            user_message, user_id=current_user["user_id"], session_id=session_id
+            augmented_message, user_id=current_user["user_id"], session_id=session_id
         )
 
         # 4) Text-to-Speech: Convert response to audio
         lang_code = detect_language(response_text)
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=120.0) as client:
             tts_response = await client.post(
                 f"{VOICE_SERVICE_URL}/voice_service/tts",
                 json={"text": response_text, "language_code": lang_code}
