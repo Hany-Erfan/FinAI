@@ -168,6 +168,12 @@ export default function SessionExplorer({ sessionId }: SessionExplorerProps) {
                 <header className="backoffice-header">
                     <h1>Session Detail</h1>
                     <div style={{ display: 'flex', gap: '1rem' }}>
+                        <button onClick={() => navigate('/backoffice')} className="btn btn-secondary">
+                            Backoffice
+                        </button>
+                        <button onClick={() => navigate('/guardrails')} className="btn btn-secondary">
+                            Guardrails
+                        </button>
                         <button onClick={handleBack} className="btn btn-secondary">
                             Back to List
                         </button>
@@ -289,6 +295,9 @@ export default function SessionExplorer({ sessionId }: SessionExplorerProps) {
                 <div style={{ display: 'flex', gap: '1rem' }}>
                     <button onClick={() => navigate('/backoffice')} className="btn btn-secondary">
                         Document Backoffice
+                    </button>
+                    <button onClick={() => navigate('/guardrails')} className="btn btn-secondary">
+                        Guardrails Management
                     </button>
                     <button onClick={() => navigate('/chat')} className="btn btn-secondary">
                         Back to Chat

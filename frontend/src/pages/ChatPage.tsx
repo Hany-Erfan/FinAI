@@ -334,6 +334,7 @@ const ChatPage = ({ auth, onLogout, sessionId, inactivityTimeout }) => {
         {auth.role === "admin" ? (
           <div className="admin-box">
             <button onClick={() => navigate('/backoffice')}>Manage FAQs</button>
+            <button onClick={() => navigate('/guardrails')}>Guardrails Management</button>
             <button onClick={() => navigate('/session-explorer')}>Session Explorer</button>
             <button onClick={() => navigate('/analysis-dashboard')}>Analysis Dashboard</button>
           </div>

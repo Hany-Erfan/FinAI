@@ -1,7 +1,7 @@
 export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 export const VECTOR_DB_BASE = import.meta.env.VITE_VECTOR_DB_URL || 'http://localhost:8004/vector_db_service';
 export const GRAFANA_BASE = import.meta.env.VITE_GRAFANA_URL || '/grafana';
-// export const GUARDRAILS_BASE = import.meta.env.VITE_GUARDRAILS_URL || 'http://localhost:8005';
+export const GUARDRAILS_BASE = import.meta.env.VITE_GUARDRAILS_URL || 'http://localhost:8005';
 export const REPOSITORY_BASE = import.meta.env.VITE_REPOSITORY_URL || 'http://localhost:8007';
 
 export const Endpoints = {
@@ -15,7 +15,7 @@ export const Endpoints = {
   CURRENT_USER: `${API_BASE}/currentUser`,
   LOGOUT: `${API_BASE}/logout`,
   SUMMARY: `${API_BASE}/summary`,
-  // GUARDRAILS_CONFIG: `${GUARDRAILS_BASE}/config`,
+  GUARDRAILS_CONFIG: `${GUARDRAILS_BASE}/config`,
   GET_MESSAGES: (session_id: string) => `${REPOSITORY_BASE}/sessions/${session_id}/messages`,
   ADMIN_SESSIONS: `${API_BASE}/admin/sessions`,
   ADMIN_SESSION_DETAIL: (id: string) => `${API_BASE}/admin/sessions/${id}`,

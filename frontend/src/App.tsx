@@ -6,6 +6,7 @@ import ChatPage from './pages/ChatPage';
 import Backoffice from './pages/Backoffice';
 import SessionExplorer from './pages/SessionExplorer';
 import AnalysisDashboard from './pages/AnalysisDashboard';
+import Guardrails from './pages/Guardrails';
 import { getCurrentUser, login } from './api/login';
 import { logout, summary } from './api/logout';
 
@@ -206,6 +207,14 @@ export default function App() {
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated} requiredRole="admin" userRole={auth?.role}>
               <AnalysisDashboard sessionId={sessionId} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/guardrails"
+          element={
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredRole="admin" userRole={auth?.role}>
+              <Guardrails sessionId={sessionId} />
             </ProtectedRoute>
           }
         />

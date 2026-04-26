@@ -43,8 +43,8 @@ fi
 : "${GOOGLE_API_KEY:?GOOGLE_API_KEY is required}"
 : "${ORCHESTRATOR_GOOGLE_API_KEY:?ORCHESTRATOR_GOOGLE_API_KEY is required}"
 : "${SERVICES_GOOGLE_API_KEY:?SERVICES_GOOGLE_API_KEY is required}"
-#: "${GUARDRAILS_API_KEY:?GUARDRAILS_API_KEY is required}"
-#: "${GUARDRAILS_LLM_MODEL:?GUARDRAILS_LLM_MODEL is required}"
+: "${GUARDRAILS_API_KEY:?GUARDRAILS_API_KEY is required}"
+: "${GUARDRAILS_LLM_MODEL:?GUARDRAILS_LLM_MODEL is required}"
 
 # ----------------------------
 # --- Cluster Configuration ---
@@ -194,8 +194,7 @@ fi
 # ----------------------------
 # --- Build and Deploy Services ---
 # ----------------------------
-# SERVICES="frontend host-agent faq-agent summary-agent vector-db-service guardrails-service repository-service"
-SERVICES="frontend host-agent faq-agent summary-agent vector-db-service repository-service"
+SERVICES="frontend host-agent faq-agent summary-agent vector-db-service guardrails-service repository-service"
 
 for service in $SERVICES; do
   # Define per-service variables
@@ -220,10 +219,10 @@ for service in $SERVICES; do
       DOCKERFILE="backend/services/vector_db_service/Dockerfile"
       BUILD_CONTEXT="."
       ;;
-#    "guardrails-service")
-#      DOCKERFILE="backend/services/guardrails/Dockerfile"
-#      BUILD_CONTEXT="."
-#      ;;
+    "guardrails-service")
+      DOCKERFILE="backend/services/guardrails/Dockerfile"
+      BUILD_CONTEXT="."
+      ;;
     "repository-service")
       DOCKERFILE="backend/services/repository_service/Dockerfile"
       BUILD_CONTEXT="."
@@ -235,37 +234,9 @@ for service in $SERVICES; do
   echo "Building $service..."
 
   if [ "$service" = "guardrails-service" ]; then
-    #: "${GUARDRAILS_API_KEY:?GUARDRAILS_API_KEY is required for guardrails-service build}"
-    #: "${GUARDRAILS_LLM_MODEL:?GUARDRAILS_LLM_MODEL is required for guardrails-service build}"
-
-    # docker build \
-    #   --platform linux/amd64 \
-    #   --build-arg GUARDRAILS_API_KEY="$GUARDRAILS_API_KEY" \
-    #   --build-arg GUARDRAILS_LLM_MODEL="$GUARDRAILS_LLM_MODEL" \
-    #   -t "$IMAGE" \
-    #   -f "$DOCKERFILE" \
-    #   "$BUILD_CONTEXT"
-    echo "Skipping guardrails build"
-  else
-    docker build \
-      --platform linux/amd64 \
-      -t "$IMAGE" \
-      -f "$DOCKERFILE" \
-      "$BUILD_CONTEXT"
-  fi
-
-  echo "Pushing $service..."
-  docker push "$IMAGE"
-
-  echo "Deploying $service..."
-  # Replace IMAGE_PLACEHOLDER with actual image and apply
-  sed "s|IMAGE_PLACEHOLDER|$IMAGE|g" "$K8S_DIR/${service}.yaml" | kubectl apply -n $NAMESPACE -f -
-
-  if [ "$service" = "guardrails-service" ]; then
-    # kubectl set resources deployment/guardrails-service -n $NAMESPACE \
-    #   --requests=cpu=500m,memory=1Gi,ephemeral-storage=1Gi \
-    #   --limits=cpu=1,memory=2Gi,ephemeral-storage=1Gi
-    echo "Skipping guardrails resource setting"
+    kubectl set resources deployment/guardrails-service -n $NAMESPACE \
+      --requests=cpu=500m,memory=1Gi,ephemeral-storage=1Gi \
+      --limits=cpu=1,memory=2Gi,ephemeral-storage=1Gi
   fi
 done
 

@@ -60,7 +60,8 @@ GUARDRAILS_URL = os.getenv("GUARDRAILS_URL", "http://localhost:8005")
 VOICE_SERVICE_URL = os.getenv("VOICE_SERVICE_URL", "http://localhost:8008")
 
 # Defaults (reference-style)
-DEFAULT_USER_ID = "default_user"
+DEFAULT_USER_ID = "default_user"# Global HTTP client for connection pooling and better performance
+_GLOBAL_HTTP_CLIENT = httpx.AsyncClient(timeout=30.0, limits=httpx.Limits(max_connections=100, max_keepalive_connections=20))
 DEFAULT_SESSION_ID = "default_session"
 
 # Global runner (reference-style)
@@ -126,53 +127,64 @@ class User(BaseModel):
 # Helpers
 # =========================
 
-async def check_guardrails_input(message: str) -> tuple[bool, str | None]:
+async def check_guardrails_input(message: str) -> tuple[bool, str | None, dict]:
     """Check user input against Guardrails service."""
-    # try:
-    #     timeout = httpx.Timeout(30.0, connect=5.0)  # allow LLM-based validators time to finish
-    #     async with httpx.AsyncClient(timeout=timeout) as client:
-    #         response = await client.post(
-    #             f"{GUARDRAILS_URL}/check_input",
-    #             json={"message": message},
-    #         )
-    #         if response.status_code == 200:
-    #             data = response.json()
-    #             if not data.get("is_safe", True):
-    #                 reason = data.get("reason")
-    #                 logger.warning(f"[GUARDRAILS] Input blocked: {reason}")
-    #                 return False, reason
-    #             return True, None
-    # 
-    #         logger.error(f"[ERROR] Guardrails input check non-200: {response.status_code} body={response.text!r}")
-    #         return False, "Validation service unavailable."  # fail closed
-    # 
-    # except Exception as e:
-    #     logger.error(f"[ERROR] Guardrails input check failed: {type(e).__name__}: {e!r}")
-    #     return False, "Validation service error."  # fail closed
-    return True, None
+    start_time = time.time()
+    logger.info(f"[GUARDRAILS 🛡️] ▶ Starting input validation...")
+    try:
+        response = await _GLOBAL_HTTP_CLIENT.post(
+            f"{GUARDRAILS_URL}/check_input",
+            json={"message": message},
+        )
+        duration = time.time() - start_time
+        if response.status_code == 200:
+            data = response.json()
+            is_safe = data.get("is_safe", True)
+            durations = data.get("metadata", {}).get("durations", {})
+            if not is_safe:
+                reason = data.get("reason")
+                logger.warning(f"[GUARDRAILS 🛡️] ❌ Input BLOCKED in {duration:.2f}s: {reason}")
+                return False, reason, durations
+            logger.info(f"[GUARDRAILS 🛡️] ✅ Input PASSED in {duration:.2f}s")
+            return True, None, durations
+
+        logger.error(f"[ERROR] Guardrails input check non-200 after {duration:.2f}s: {response.status_code} body={response.text!r}")
+        return False, "Validation service unavailable."  # fail closed
+
+    except Exception as e:
+        duration = time.time() - start_time
+        logger.error(f"[GUARDRAILS 🛡️] ❌ Input check CRASHED in {duration:.2f}s: {type(e).__name__}")
+        return False, "Validation service error."  # fail closed
 
 
-async def check_guardrails_output(message: str) -> tuple[bool, str | None, str | None]:
+async def check_guardrails_output(message: str) -> tuple[bool, str | None, str | None, dict]:
     """Check agent output against Guardrails service."""
-    # try:
-    #     async with httpx.AsyncClient(timeout=5.0) as client:
-    #         response = await client.post(
-    #             f"{GUARDRAILS_URL}/check_output",
-    #             json={"message": message},
-    #         )
-    #         if response.status_code == 200:
-    #             data = response.json()
-    #             is_safe = data.get("is_safe", True)
-    #             filtered = data.get("filtered_message")
-    #             reason = data.get("reason")
-    #             if not is_safe:
-    #                 logger.warning(
-    #                     f"[GUARDRAILS] Output blocked/filtered: {reason}"
-    #                 )
-    #             return is_safe, filtered, reason
-    # except Exception as e:
-    #     logger.error(f"[ERROR] Guardrails output check failed: {e}")
-    return True, message, None
+    start_time = time.time()
+    logger.info(f"[GUARDRAILS 🛡️] ▶ Starting output validation...")
+    try:
+        response = await _GLOBAL_HTTP_CLIENT.post(
+            f"{GUARDRAILS_URL}/check_output",
+            json={"message": message},
+        )
+        duration = time.time() - start_time
+        if response.status_code == 200:
+            data = response.json()
+            is_safe = data.get("is_safe", True)
+            filtered = data.get("filtered_message")
+            reason = data.get("reason")
+            durations = data.get("metadata", {}).get("durations", {})
+            if not is_safe:
+                logger.warning(
+                    f"[GUARDRAILS 🛡️] ⚠️ Output filtered/blocked in {duration:.2f}s: {reason}"
+                )
+            else:
+                logger.info(f"[GUARDRAILS 🛡️] ✅ Output PASSED in {duration:.2f}s")
+            return is_safe, filtered, reason, durations
+            
+    except Exception as e:
+        duration = time.time() - start_time
+        logger.error(f"[GUARDRAILS 🛡️] ❌ Output check CRASHED in {duration:.2f}s: {e}")
+    return True, message, None, {}
 
 
 def log_tool_calls_and_responses(event) -> None:
@@ -252,13 +264,15 @@ async def get_response_from_agent(message: str, user_id: str, session_id: str) -
                             a2a_dur = f" (sub-agent took {now - t_routing_call:.2f}s)" if t_routing_call else ""
                             logger.info(f"[AGENT ⏱️ ]   ├─ Tool response '{fn_name}' at +{now - attempt_start:.2f}s{a2a_dur}")
 
+                # Accumulate text parts as they arrive (streaming support)
+                if event.content and event.content.parts:
+                    for part in event.content.parts:
+                        if getattr(part, "text", None):
+                            final_response_text += part.text
+
                 if event.is_final_response():
                     t_final_response = now
-                    if event.content and event.content.parts:
-                        final_response_text = "".join(
-                            [p.text for p in event.content.parts if getattr(p, "text", None)]
-                        ).strip()
-                    elif event.actions and getattr(event.actions, "escalate", None):
+                    if event.actions and getattr(event.actions, "escalate", None):
                         final_response_text = (
                             f"Agent escalated: {getattr(event, 'error_message', None) or 'No specific message.'}"
                         )
@@ -267,7 +281,7 @@ async def get_response_from_agent(message: str, user_id: str, session_id: str) -
                     # DON'T break; consume rest of stream (reference behavior)
 
             total_attempt = time.time() - attempt_start
-            logger.info(f"[AGENT ⏱️ ]   └─ Agent run completed in {total_attempt:.2f}s ({event_count} events)")
+            logger.info(f"[AGENT ⏱️ ] └─ Agent run completed in {total_attempt:.2f}s ({event_count} events)")
             return final_response_text if final_response_text else "No response from agent."
 
         except Exception as e:
@@ -413,7 +427,10 @@ async def chat_endpoint(
         )
 
         # 1) Mask user's message before DB storage 
+        t_mask_start = time.time()
         masked_user_message = repo.masker.mask(request.message)
+        t_mask = time.time() - t_mask_start
+        logger.info(f"[PERF] Masking took {t_mask:.4f}s")
         repo.save_message(
             session_id=session_id,
             role=MessageRole.USER,
@@ -421,7 +438,10 @@ async def chat_endpoint(
         )
 
         # 2) Guardrails input
-        is_safe_input, input_reason = await check_guardrails_input(request.message)
+        t_input_start = time.time()
+        is_safe_input, input_reason, input_durations = await check_guardrails_input(request.message)
+        t_input = time.time() - t_input_start
+        
         if not is_safe_input:
             response = input_reason if input_reason else (
                     ".أسف ، لا أستطيع تنفيذ طلبك بسبب سياسات الاستخدام"
@@ -433,7 +453,8 @@ async def chat_endpoint(
                 role=MessageRole.MODEL,
                         content=response,
             )
-
+            
+            logger.warning(f"[FIN-AI 🛑] Request BLOCKED by Input Guardrails in {t_input:.2f}s")
             return ChatResponse(
                 response=response,
                 status="completed",
@@ -463,35 +484,45 @@ async def chat_endpoint(
                 state=current_request_state or {},
             )
         else:
-            try:
-                actions = EventActions(state_delta=current_request_state)
-                event = Event(
-                    invocation_id="http_bridge_state_update",
-                    author="host_agent_http",
-                    actions=actions,
-                )
-                await SESSION_SERVICE.append_event(session, event)
-            except Exception as exc:
-                logger.warning(f"[HTTP-DEBUG] Failed to append session state: {exc}")
+            # Session already exists, we could update state here if needed, 
+            # but ADK run_async handles it well enough.
+            pass
 
         # 4) just call get_response_from_agent (global runner)
-        start_time = time.time()
-        
+        t_agent_start = time.time()
         response_text = await get_response_from_agent(
             request.message, user_id=current_user["user_id"], session_id=session_id
         )
-        
-        duration = time.time() - start_time
-        logger.info(f"Response time for session {session_id}: {duration:.2f}s")
-
-        if "Agent escalated" in response_text or "please contact our customer service team" in response_text.lower() or "يرجى الاتصال بفريق خدمة العملاء" in response_text:
-            logger.info(f"Agent escalated for session {session_id}")
-
-        # If the agent responded in Arabic, prefer that for downstream messages
-        lang = detect_language(response_text or request.message or "")
+        t_agent = time.time() - t_agent_start
 
         # 6) Guardrails output
-        is_safe_output, filtered, out_reason = await check_guardrails_output(response_text)
+        t_output_start = time.time()
+        is_safe_output, filtered, out_reason, output_durations = await check_guardrails_output(response_text)
+        t_output = time.time() - t_output_start
+        
+        # Performance Summary
+        total_time = time.time() - t_input_start
+        durations = {
+            "Guardrails Input": t_input,
+            "Agent Reasoning": t_agent,
+            "Guardrails Output": t_output
+        }
+        longest_step = max(durations, key=durations.get)
+        
+        logger.info(f"\n" + "="*50)
+        logger.info(f"[FIN-AI ✨] REQUEST PERFORMANCE SUMMARY")
+        logger.info(f"  ├─ 🎭 PII Masking:  {t_mask:.2f}s")
+        logger.info(f"  ├─ 🛡️ Input Check:  {t_input:.2f}s")
+        for step, dur in input_durations.items():
+            logger.info(f"  │  ├─ {step.capitalize()}: {dur:.2f}s")
+        logger.info(f"  ├─ 🧠 Agent Logic:  {t_agent:.2f}s")
+        logger.info(f"  ├─ 🛡️ Output Check: {t_output:.2f}s")
+        for step, dur in output_durations.items():
+            logger.info(f"  │  ├─ {step.capitalize()}: {dur:.2f}s")
+        logger.info(f"  └─ 🏁 TOTAL TIME:   {total_time:.2f}s")
+        logger.info(f"  [!] Longest Step: {longest_step} ({durations[longest_step]:.2f}s)")
+        logger.info("="*50 + "\n")
+
         final_response = (
             filtered if (is_safe_output and filtered is not None) else (
                 out_reason if out_reason else (
@@ -512,7 +543,6 @@ async def chat_endpoint(
 
         # Language detection via script analysis
         language = Language.AR if detect_language(final_response) == "ar" else Language.EN
-        
         logger.info(f"Language for session {session_id}: {language}")
 
         return ChatResponse(
