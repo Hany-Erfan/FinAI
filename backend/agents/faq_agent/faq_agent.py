@@ -1,36 +1,15 @@
 import os
-import httpx
 from google.adk.agents import LlmAgent
-from google.adk.tools import FunctionTool
+from google.adk.tools.mcp_tool.mcp_toolset import (
+    MCPToolset,
+    StdioServerParameters,
+)
 from backend.common.agent import Agent
 from backend.common.cache_dict import FAQAgentCache
 
-# --- Configuration ---
-VECTOR_DB_URL = os.getenv('VECTOR_DB_SERVICE_URL', 'http://vector-db-service:8004')
-REQUEST_TIMEOUT = 20.0
-
-
-async def retrieve_product_info(user_query: str) -> str:
-    """Retrieves product related information based on user query.
-
-    Args:
-        user_query: The user query to retrieve product information for.
-
-    Returns:
-        The product information based on the user query.
-    """
-    endpoint = f'{VECTOR_DB_URL}/vector_db_service/retreive_product'
-    try:
-        async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
-            response = await client.get(endpoint, params={'user_query': user_query})
-            response.raise_for_status()
-            return response.text
-    except Exception as e:
-        return f'Failed to retrieve product information: {str(e)}'
-
 
 def create_faq_agent(user_id: str) -> LlmAgent:
-    """Constructs the ADK agent."""
+    """Constructs the ADK agent using MCP."""
     return LlmAgent(
         model=os.getenv("FAQ_AGENT_MODEL_ID", "gemini-3-flash-preview"),
         name='faq_agent',
@@ -53,7 +32,13 @@ def create_faq_agent(user_id: str) -> LlmAgent:
         - Use Markdown for formatting.
         """,
         tools=[
-            FunctionTool(retrieve_product_info)
+            MCPToolset(
+                connection_params=StdioServerParameters(
+                    command='python',
+                    args=['backend/agents/faq_agent/faq_mcp.py'],
+                    env=dict(os.environ),
+                ),
+            )
         ],
     )
 
@@ -62,7 +47,7 @@ class FAQAgent(Agent):
     """FAQ banking agent with session and caching support."""
 
     def __init__(self, user_id: str):
-        """Initialize the retail agent."""
+        """Initialize the FAQ agent."""
         # Create the Google ADK agent
         google_agent = create_faq_agent(user_id)
 

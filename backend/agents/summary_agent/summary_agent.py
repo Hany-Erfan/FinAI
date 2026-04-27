@@ -1,12 +1,15 @@
 import os
-from backend.agents.summary_agent.summary_mcp import record_summary
 from google.adk.agents import LlmAgent
+from google.adk.tools.mcp_tool.mcp_toolset import (
+    MCPToolset,
+    StdioServerParameters,
+)
 from backend.common.agent import Agent
 from backend.common.cache_dict import SummaryAgentCache
 
 
 def create_summary_agent(user_id: str, session_id: str) -> LlmAgent:
-    """Constructs the ADK agent."""
+    """Constructs the ADK agent using MCP."""
     return LlmAgent(
         model=os.getenv("SUMMARY_AGENT_MODEL_ID", "gemini-3-flash-preview"),
         name='summary_agent',
@@ -29,8 +32,15 @@ def create_summary_agent(user_id: str, session_id: str) -> LlmAgent:
                 Afterwards, the output should be saved in the database using the save_summaries.
                 Do not output any other text. Call the tool and stop.
                 """,
-                
-        tools=[record_summary],
+        tools=[
+            MCPToolset(
+                connection_params=StdioServerParameters(
+                    command='python',
+                    args=['backend/agents/summary_agent/summary_mcp.py'],
+                    env=dict(os.environ),
+                ),
+            )
+        ],
     )
 
 
@@ -38,7 +48,7 @@ class SummaryAgent(Agent):
     """Summary banking agent with session and caching support."""
 
     def __init__(self, user_id: str, session_id: str):
-        """Initialize the retail agent."""
+        """Initialize the summary agent."""
         # Create the Google ADK agent
         google_agent = create_summary_agent(user_id, session_id)
         
