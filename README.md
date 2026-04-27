@@ -122,6 +122,7 @@ sequenceDiagram
     GOOGLE_API_KEY=your_key
     VOICE_TTS_EN_VOICE=en-US-Journey-F
     VOICE_TTS_AR_VOICE=ar-XA-Chirp3-HD-Kore
+    GUARDRAILS_LLM_MODEL=gemini-1.5-flash
     ```
 
 3.  **Spin up the stack**:
@@ -134,6 +135,9 @@ sequenceDiagram
     - **Frontend**: `http://localhost:5173`
     - **Host Agent API**: `http://localhost:8000`
     - **Grafana**: `http://localhost:3000`
+
+### ⚡ Development Productivity
+The backend services (Host Agent, FAQ Agent, Guardrails Service) are configured with **Hot Reload** enabled in Docker. Any changes made to the Python code in the `backend/` directory will be reflected immediately without needing to restart the containers.
 
 ---
 
