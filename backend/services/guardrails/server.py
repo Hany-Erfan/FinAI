@@ -73,7 +73,7 @@ class ValidationResponse(BaseModel):
     is_safe: bool
     filtered_message: Optional[str] = None
     reason: Optional[str] = None
-    metadata: Optional[dict] = None
+    metadata: dict = {}
 
 
 # ---------------------------------------------------------
@@ -519,7 +519,7 @@ async def check_input(payload: ValidationRequest) -> ValidationResponse:
         config.escalation_trigger, config.restrict_to_topic, config.detect_pii_input,
         config.secrets_present_input, config.toxic_language
     ]):
-        return ValidationResponse(is_safe=True, filtered_message=payload.message, reason=None)
+        return ValidationResponse(is_safe=True, filtered_message=payload.message, reason=None, metadata={})
 
     msg = payload.message.strip().lower()
     if msg in {"hey", "hi", "hello", "yo", "sup", "what's up", "whats up"}:
@@ -621,7 +621,7 @@ async def check_output(payload: ValidationRequest) -> ValidationResponse:
     if not any([
         config.detect_pii_output, config.secrets_present_output, config.is_safe_output
     ]):
-        return ValidationResponse(is_safe=True, filtered_message=payload.message, reason=None)
+        return ValidationResponse(is_safe=True, filtered_message=payload.message, reason=None, metadata={})
 
     global output_guard
     if output_guard is None:

@@ -140,7 +140,8 @@ async def check_guardrails_input(message: str) -> tuple[bool, str | None, dict]:
         if response.status_code == 200:
             data = response.json()
             is_safe = data.get("is_safe", True)
-            durations = data.get("metadata", {}).get("durations", {})
+            metadata = data.get("metadata") or {}
+            durations = metadata.get("durations") or {}
             if not is_safe:
                 reason = data.get("reason")
                 logger.warning(f"[GUARDRAILS 🛡️] ❌ Input BLOCKED in {duration:.2f}s: {reason}")
@@ -149,12 +150,12 @@ async def check_guardrails_input(message: str) -> tuple[bool, str | None, dict]:
             return True, None, durations
 
         logger.error(f"[ERROR] Guardrails input check non-200 after {duration:.2f}s: {response.status_code} body={response.text!r}")
-        return False, "Validation service unavailable."  # fail closed
+        return False, "Validation service unavailable.", {}  # fail closed
 
     except Exception as e:
         duration = time.time() - start_time
         logger.error(f"[GUARDRAILS 🛡️] ❌ Input check CRASHED in {duration:.2f}s: {type(e).__name__}")
-        return False, "Validation service error."  # fail closed
+        return False, "Validation service error.", {}  # fail closed
 
 
 async def check_guardrails_output(message: str) -> tuple[bool, str | None, str | None, dict]:
@@ -172,7 +173,8 @@ async def check_guardrails_output(message: str) -> tuple[bool, str | None, str |
             is_safe = data.get("is_safe", True)
             filtered = data.get("filtered_message")
             reason = data.get("reason")
-            durations = data.get("metadata", {}).get("durations", {})
+            metadata = data.get("metadata") or {}
+            durations = metadata.get("durations") or {}
             if not is_safe:
                 logger.warning(
                     f"[GUARDRAILS 🛡️] ⚠️ Output filtered/blocked in {duration:.2f}s: {reason}"
@@ -180,11 +182,14 @@ async def check_guardrails_output(message: str) -> tuple[bool, str | None, str |
             else:
                 logger.info(f"[GUARDRAILS 🛡️] ✅ Output PASSED in {duration:.2f}s")
             return is_safe, filtered, reason, durations
+
+        logger.error(f"[ERROR] Guardrails output check non-200: {response.status_code}")
+        return False, None, "Validation service unavailable.", {}
             
     except Exception as e:
         duration = time.time() - start_time
         logger.error(f"[GUARDRAILS 🛡️] ❌ Output check CRASHED in {duration:.2f}s: {e}")
-    return True, message, None, {}
+        return False, None, "Validation service error.", {}
 
 
 def log_tool_calls_and_responses(event) -> None:
