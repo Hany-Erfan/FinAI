@@ -138,6 +138,14 @@ sequenceDiagram
 
 ### ⚡ Development Productivity
 The backend services (Host Agent, FAQ Agent, Guardrails Service) are configured with **Hot Reload** enabled in Docker. Any changes made to the Python code in the `backend/` directory will be reflected immediately without needing to restart the containers.
+141: 
+142: ### 📊 Advanced Performance Monitoring
+143: The Host Agent now provides a detailed **REQUEST PERFORMANCE SUMMARY** in the logs for every interaction. This includes:
+144: - **PII Masking & Guardrails**: Time spent on pre-processing and safety checks.
+145: - **Host Agent Retries**: History of retries for the main routing logic (max 20 attempts).
+146: - **Sub-Agent Breakdown**: Precise timing for each specialized agent (Retail, FAQ, etc.).
+147: - **Internal Sub-Agent Retries**: Nested retry history inside sub-agents (e.g., if retrieval fails, you see exactly how many times the sub-agent retried internally).
+148: - **Fallback Logic**: If the LLM returns empty text, the system automatically falls back to the raw sub-agent response to ensure the user always receives an answer.
 
 ---
 

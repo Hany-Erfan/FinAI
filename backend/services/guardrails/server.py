@@ -81,18 +81,18 @@ class ValidationResponse(BaseModel):
 # ---------------------------------------------------------
 
 class GuardrailsConfigState:
-    is_safe_input: bool = True
-    enforce_anonymous_mode: bool = True
-    block_financial_advisory: bool = True
-    escalation_trigger: bool = True
-    restrict_to_topic: bool = True
-    detect_pii_input: bool = True
-    secrets_present_input: bool = True
-    toxic_language: bool = True
+    is_safe_input: bool = False
+    enforce_anonymous_mode: bool = False
+    block_financial_advisory: bool = False
+    escalation_trigger: bool = False
+    restrict_to_topic: bool = False
+    detect_pii_input: bool = False
+    secrets_present_input: bool = False
+    toxic_language: bool = False
 
-    detect_pii_output: bool = True
-    secrets_present_output: bool = True
-    is_safe_output: bool = True
+    detect_pii_output: bool = False
+    secrets_present_output: bool = False
+    is_safe_output: bool = False
 
     valid_topics: List[str] = [
         "bank accounts",

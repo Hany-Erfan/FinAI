@@ -6,7 +6,7 @@ import traceback
 from pprint import pformat
 import secrets
 import traceback
-from typing import Optional
+from typing import Optional, Any
 import httpx
 from backend.common.masking_pii import DataMasker
 from backend.postgres_db.database import get_db, init_db
@@ -41,8 +41,8 @@ setup_telemetry()
 setup_logging()
 
 
-# =========================
-# App / Agent Setup
+# Sub-agent attempt tracking
+from backend.common.context import SUBAGENT_ATTEMPTS
 # =========================
 
 APP_NAME = "routing_app"
@@ -215,7 +215,7 @@ def log_tool_calls_and_responses(event) -> None:
                 logger.debug(pformat(formatted, indent=2, width=80))
 
 
-async def get_response_from_agent(message: str, user_id: str, session_id: str) -> str:
+async def get_response_from_agent(message: str, user_id: str, session_id: str) -> tuple[str, dict[str, float], list[float]]:
     """
     Use the global Runner, log tool calls, return only final response text.
     Also consumes full stream (no early break) to avoid GeneratorExit issues.
@@ -223,10 +223,14 @@ async def get_response_from_agent(message: str, user_id: str, session_id: str) -
     if ROUTING_AGENT_RUNNER is None:
         return "Error: Agent not initialized yet. Please wait for startup to complete."
 
-    max_retries = 4
+    max_retries = 20
     base_delay = 1.0
-    agent_start = time.time()
+    attempt_durations = []
+    # Initialize sub-agent attempts for this request context
+    SUBAGENT_ATTEMPTS.set({})
 
+    last_tool_response = ""
+    
     for attempt in range(max_retries + 1):
         attempt_start = time.time()
         try:
@@ -239,10 +243,12 @@ async def get_response_from_agent(message: str, user_id: str, session_id: str) -
 
             final_response_text = ""
             event_count = 0
+            tool_durations = {} # New: Track sub-agent timings
             t_first_event = None
             t_routing_call = None
             t_tool_response = None
             t_final_response = None
+            current_target = None # New: Track current sub-agent
 
             async for event in event_iterator:
                 event_count += 1
@@ -261,13 +267,23 @@ async def get_response_from_agent(message: str, user_id: str, session_id: str) -
                             t_routing_call = now
                             fn_name = part.function_call.name
                             fn_args = getattr(part.function_call, "args", {}) or {}
-                            target = fn_args.get("agent_name", "")
-                            logger.info(f"[AGENT ⏱️ ]   ├─ Tool call '{fn_name}' at +{now - attempt_start:.2f}s" + (f" → '{target}'" if target else ""))
+                            current_target = fn_args.get("agent_name", "")
+                            logger.info(f"[AGENT ⏱️ ]   ├─ Tool call '{fn_name}' at +{now - attempt_start:.2f}s" + (f" → '{current_target}'" if current_target else ""))
                         if getattr(part, "function_response", None):
                             t_tool_response = now
                             fn_name = part.function_response.name
-                            a2a_dur = f" (sub-agent took {now - t_routing_call:.2f}s)" if t_routing_call else ""
+                            dur = now - t_routing_call if t_routing_call else 0
+                            if current_target:
+                                tool_durations[current_target] = dur
+                            a2a_dur = f" (sub-agent took {dur:.2f}s)" if t_routing_call else ""
                             logger.info(f"[AGENT ⏱️ ]   ├─ Tool response '{fn_name}' at +{now - attempt_start:.2f}s{a2a_dur}")
+                            
+                            # Track last tool response for fallback
+                            resp = part.function_response.response
+                            if isinstance(resp, dict) and "response" in resp:
+                                last_tool_response = str(resp["response"])
+                            else:
+                                last_tool_response = str(resp)
 
                 # Accumulate text parts as they arrive (streaming support)
                 if event.content and event.content.parts:
@@ -286,24 +302,35 @@ async def get_response_from_agent(message: str, user_id: str, session_id: str) -
                     # DON'T break; consume rest of stream (reference behavior)
 
             total_attempt = time.time() - attempt_start
+            attempt_durations.append(total_attempt)
             logger.info(f"[AGENT ⏱️ ] └─ Agent run completed in {total_attempt:.2f}s ({event_count} events)")
-            return final_response_text if final_response_text else "No response from agent."
+            
+            final_txt = final_response_text
+            if not final_txt:
+                if last_tool_response:
+                    logger.warning("[AGENT ⏱️ ] Gemini returned empty text; falling back to last tool response.")
+                    final_txt = last_tool_response
+                else:
+                    final_txt = "I'm sorry, I couldn't process your request at this time (no response from agent)."
+            
+            return final_txt, tool_durations, attempt_durations
 
         except Exception as e:
             error_str = str(e)
             is_503 = "503" in error_str or "UNAVAILABLE" in error_str or "temporarily overloaded" in error_str.lower()
             attempt_dur = time.time() - attempt_start
+            attempt_durations.append(attempt_dur)
             
             if is_503 and attempt < max_retries:
                 import asyncio
-                delay = base_delay * (2 ** attempt)  # 1s, 2s, 4s, 8s
+                delay = min(base_delay * (2 ** attempt), 10)
                 logger.warning(f"[AGENT ⏱️ ]   ├─ ⚠️ 503 UNAVAILABLE after {attempt_dur:.2f}s — retrying in {delay}s (attempt {attempt + 1}/{max_retries})")
                 await asyncio.sleep(delay)
                 continue
                 
             logger.info(f"Error in get_response_from_agent (Type: {type(e)}): {e}")
             traceback.print_exc()
-            return f"An error occurred while processing your request: {error_str}"
+            return f"An error occurred while processing your request: {error_str}", {}, attempt_durations
 
 def get_chat_respository(db = Depends(get_db)) -> SessionRepository:
     return SessionRepository(db = db, masker= DataMasker())
@@ -495,10 +522,12 @@ async def chat_endpoint(
 
         # 4) just call get_response_from_agent (global runner)
         t_agent_start = time.time()
-        response_text = await get_response_from_agent(
+        response_text, agent_durations, all_attempts = await get_response_from_agent(
             request.message, user_id=current_user["user_id"], session_id=session_id
         )
         t_agent = time.time() - t_agent_start
+        # Read sub-agent attempts collected during the run
+        sub_attempts = SUBAGENT_ATTEMPTS.get()
 
         # 6) Guardrails output
         t_output_start = time.time()
@@ -521,6 +550,16 @@ async def chat_endpoint(
         for step, dur in input_durations.items():
             logger.info(f"  │  ├─ {step.capitalize()}: {dur:.2f}s")
         logger.info(f"  ├─ 🧠 Agent Logic:  {t_agent:.2f}s")
+        if len(all_attempts) > 1:
+            logger.info(f"  │  ├─ Attempts:   {len(all_attempts)} calls")
+            for i, dur in enumerate(all_attempts):
+                logger.info(f"  │  │  └── Try {i+1}: {dur:.2f}s")
+        for ag, dur in agent_durations.items():
+            logger.info(f"  │  ├─ 🤖 {ag}: {dur:.2f}s")
+            ag_atts = sub_attempts.get(ag, [])
+            if len(ag_atts) > 1:
+                for i, d in enumerate(ag_atts):
+                    logger.info(f"  │  │  └── Try {i+1}: {d:.2f}s")
         logger.info(f"  ├─ 🛡️ Output Check: {t_output:.2f}s")
         for step, dur in output_durations.items():
             logger.info(f"  │  ├─ {step.capitalize()}: {dur:.2f}s")
@@ -657,7 +696,7 @@ async def voice_chat_endpoint(
         # Get agent response
         logger.info(f"[VOICE ⏱️ ] ▶ STEP 3: Agent processing starting...")
         t0 = time.time()
-        response_text = await get_response_from_agent(
+        response_text, _, _ = await get_response_from_agent(
             augmented_message, user_id=current_user["user_id"], session_id=session_id
         )
         agent_dur = time.time() - t0

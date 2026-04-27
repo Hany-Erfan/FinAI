@@ -1,4 +1,5 @@
 import logging
+import time
 
 from a2a.server.agent_execution import AgentExecutor
 from a2a.server.agent_execution.context import RequestContext
@@ -87,10 +88,12 @@ class FAQExecutor(AgentExecutor):
         self._active_sessions.add(session_id)
 
         try:
-            max_retries = 4
+            max_retries = 20
             base_delay = 1.0
             
+            attempt_durations = []
             for attempt in range(max_retries + 1):
+                t_att_start = time.time()
                 try:
                     final_event = None
                     async for event in faq_agent.runner.run_async(
@@ -129,9 +132,11 @@ class FAQExecutor(AgentExecutor):
                             if (part.text or part.file_data or part.inline_data)
                         ]
                         logger.debug('Yielding final response: %s', parts)
+                        att_dur = time.time() - t_att_start
+                        attempt_durations.append(att_dur)
                         await task_updater.add_artifact(parts)
                         await task_updater.update_status(
-                            TaskState.completed, final=True
+                            TaskState.completed, final=True, metadata={"attempts": attempt_durations}
                         )
                     break
                 except Exception as e:
@@ -139,8 +144,10 @@ class FAQExecutor(AgentExecutor):
                     is_503 = "503" in error_str or "UNAVAILABLE" in error_str or "temporarily overloaded" in error_str.lower()
                     
                     if is_503 and attempt < max_retries:
+                        att_dur = time.time() - t_att_start
+                        attempt_durations.append(att_dur)
                         import asyncio
-                        delay = base_delay * (2 ** attempt)
+                        delay = min(base_delay * (2 ** attempt), 10)
                         logger.warning(f"503 UNAVAILABLE encountered. Retrying in {delay} seconds... (Attempt {attempt + 1}/{max_retries})")
                         await asyncio.sleep(delay)
                         continue

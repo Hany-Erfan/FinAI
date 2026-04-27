@@ -31,6 +31,8 @@ from backend.host_agent.remote_agent_connection import (
 )
 from observability import get_tracer, get_logger
 from opentelemetry import trace
+# Import subagent attempts context var
+from backend.common.context import SUBAGENT_ATTEMPTS
 
 logger = get_logger(__name__)
 
@@ -672,6 +674,23 @@ class RoutingAgent:
 
                 task_result = send_response.root.result
                 logger.debug(f"DEBUG: Task result: {task_result}")
+
+                # Extract sub-agent attempts from metadata
+                # Note: ADK Task objects might store metadata in different places depending on version
+                # We'll try to find it in the result's metadata if available
+                subagent_attempts = getattr(task_result, "metadata", {}).get("attempts", [])
+                if not subagent_attempts and hasattr(task_result, "root"):
+                     # A2A sometimes wraps things
+                     subagent_attempts = getattr(task_result.root, "metadata", {}).get("attempts", [])
+
+                if subagent_attempts:
+                    logger.info(f"[AGENT ⏱️ ]   │  └── Sub-agent made {len(subagent_attempts)} attempt(s): {', '.join([f'{d:.2f}s' for d in subagent_attempts])}")
+                    # Store in ContextVar so main.py summary can pick it up
+                    current = SUBAGENT_ATTEMPTS.get()
+                    current[agent_name] = subagent_attempts
+                    SUBAGENT_ATTEMPTS.set(current)
+                    # Also keep in state as backup
+                    tool_context.state["last_subagent_attempts"] = subagent_attempts
 
                 # Track task result
                 span.set_attribute("routing.task_state", task_result.status.state)
