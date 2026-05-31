@@ -171,9 +171,9 @@ export default function SessionExplorer({ sessionId }: SessionExplorerProps) {
                         <button onClick={() => navigate('/backoffice')} className="btn btn-secondary">
                             Backoffice
                         </button>
-                        <button onClick={() => navigate('/guardrails')} className="btn btn-secondary">
+                        {/* <button onClick={() => navigate('/guardrails')} className="btn btn-secondary">
                             Guardrails
-                        </button>
+                        </button> */}
                         <button onClick={handleBack} className="btn btn-secondary">
                             Back to List
                         </button>
@@ -296,9 +296,9 @@ export default function SessionExplorer({ sessionId }: SessionExplorerProps) {
                     <button onClick={() => navigate('/backoffice')} className="btn btn-secondary">
                         Document Backoffice
                     </button>
-                    <button onClick={() => navigate('/guardrails')} className="btn btn-secondary">
+                    {/* <button onClick={() => navigate('/guardrails')} className="btn btn-secondary">
                         Guardrails Management
-                    </button>
+                    </button> */}
                     <button onClick={() => navigate('/chat')} className="btn btn-secondary">
                         Back to Chat
                     </button>

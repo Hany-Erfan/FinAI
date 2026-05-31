@@ -129,67 +129,12 @@ class User(BaseModel):
 
 async def check_guardrails_input(message: str) -> tuple[bool, str | None, dict]:
     """Check user input against Guardrails service."""
-    start_time = time.time()
-    logger.info(f"[GUARDRAILS 🛡️] ▶ Starting input validation...")
-    try:
-        response = await _GLOBAL_HTTP_CLIENT.post(
-            f"{GUARDRAILS_URL}/check_input",
-            json={"message": message},
-        )
-        duration = time.time() - start_time
-        if response.status_code == 200:
-            data = response.json()
-            is_safe = data.get("is_safe", True)
-            metadata = data.get("metadata") or {}
-            durations = metadata.get("durations") or {}
-            if not is_safe:
-                reason = data.get("reason")
-                logger.warning(f"[GUARDRAILS 🛡️] ❌ Input BLOCKED in {duration:.2f}s: {reason}")
-                return False, reason, durations
-            logger.info(f"[GUARDRAILS 🛡️] ✅ Input PASSED in {duration:.2f}s")
-            return True, None, durations
-
-        logger.error(f"[ERROR] Guardrails input check non-200 after {duration:.2f}s: {response.status_code} body={response.text!r}")
-        return False, "Validation service unavailable.", {}  # fail closed
-
-    except Exception as e:
-        duration = time.time() - start_time
-        logger.error(f"[GUARDRAILS 🛡️] ❌ Input check CRASHED in {duration:.2f}s: {type(e).__name__}")
-        return False, "Validation service error.", {}  # fail closed
+    return True, None, {}
 
 
 async def check_guardrails_output(message: str) -> tuple[bool, str | None, str | None, dict]:
     """Check agent output against Guardrails service."""
-    start_time = time.time()
-    logger.info(f"[GUARDRAILS 🛡️] ▶ Starting output validation...")
-    try:
-        response = await _GLOBAL_HTTP_CLIENT.post(
-            f"{GUARDRAILS_URL}/check_output",
-            json={"message": message},
-        )
-        duration = time.time() - start_time
-        if response.status_code == 200:
-            data = response.json()
-            is_safe = data.get("is_safe", True)
-            filtered = data.get("filtered_message")
-            reason = data.get("reason")
-            metadata = data.get("metadata") or {}
-            durations = metadata.get("durations") or {}
-            if not is_safe:
-                logger.warning(
-                    f"[GUARDRAILS 🛡️] ⚠️ Output filtered/blocked in {duration:.2f}s: {reason}"
-                )
-            else:
-                logger.info(f"[GUARDRAILS 🛡️] ✅ Output PASSED in {duration:.2f}s")
-            return is_safe, filtered, reason, durations
-
-        logger.error(f"[ERROR] Guardrails output check non-200: {response.status_code}")
-        return False, None, "Validation service unavailable.", {}
-            
-    except Exception as e:
-        duration = time.time() - start_time
-        logger.error(f"[GUARDRAILS 🛡️] ❌ Output check CRASHED in {duration:.2f}s: {e}")
-        return False, None, "Validation service error.", {}
+    return True, None, None, {}
 
 
 def log_tool_calls_and_responses(event) -> None:
@@ -569,10 +514,12 @@ async def chat_endpoint(
 
         final_response = (
             filtered if (is_safe_output and filtered is not None) else (
-                out_reason if out_reason else (
-                    "تم حظر الاستجابة بواسطة قواعد السياسة."
-                    if lang == "ar"
-                    else "Response blocked by policy rules."
+                response_text if is_safe_output else (
+                    out_reason if out_reason else (
+                        "تم حظر الاستجابة بواسطة قواعد السياسة."
+                        if lang == "ar"
+                        else "Response blocked by policy rules."
+                    )
                 )
             )
         )

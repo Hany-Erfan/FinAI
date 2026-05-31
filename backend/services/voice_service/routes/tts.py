@@ -58,9 +58,9 @@ async def text_to_speech(request: TTSRequest):
     try:
         logger.info(f"Synthesizing text: {request.text[:50]}... in {request.language_code}")
         
-        GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+        GOOGLE_API_KEY = os.getenv("GOOGLE_TTS_API_KEY") or os.getenv("GOOGLE_API_KEY")
         if not GOOGLE_API_KEY:
-            logger.error("GOOGLE_API_KEY not set")
+            logger.error("GOOGLE_API_KEY / GOOGLE_TTS_API_KEY not set")
             return {"status": "error", "message": "API Key not configured"}
 
         # We now instruct the host_agent to output conversational, flowing text without markdown natively.

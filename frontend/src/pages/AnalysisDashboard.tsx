@@ -231,7 +231,7 @@ export default function AnalysisDashboard({ sessionId }: AnalysisDashboardProps)
             <header className="backoffice-header">
                 <h1>Analysis Dashboard</h1>
                 <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                    <button onClick={() => navigate('/guardrails')} className="btn btn-primary">Guardrails Management</button>
+                    {/* <button onClick={() => navigate('/guardrails')} className="btn btn-primary">Guardrails Management</button> */}
                     <button onClick={() => navigate('/chat')} className="btn btn-secondary">Back to Chat</button>
                     <button onClick={() => navigate('/backoffice')} className="btn btn-secondary">Document Backoffice</button>
                     <button onClick={() => navigate('/session-explorer')} className="btn btn-primary">Session Explorer</button>

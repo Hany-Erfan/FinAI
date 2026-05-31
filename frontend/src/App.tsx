@@ -210,14 +210,14 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route
+        {/* <Route
           path="/guardrails"
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated} requiredRole="admin" userRole={auth?.role}>
               <Guardrails sessionId={sessionId} />
             </ProtectedRoute>
           }
-        />
+        /> */}
       </Routes>
       </Router>
     </div>

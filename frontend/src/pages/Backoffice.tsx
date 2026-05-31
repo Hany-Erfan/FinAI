@@ -163,7 +163,7 @@ export default function Backoffice({ sessionId }: BackofficeProps) {
             <header className="backoffice-header">
                 <h1>Document Backoffice</h1>
                 <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                    <button onClick={() => navigate('/guardrails')} className="btn btn-primary">Guardrails Management</button>
+                    {/* <button onClick={() => navigate('/guardrails')} className="btn btn-primary">Guardrails Management</button> */}
                     <button onClick={() => navigate('/analysis-dashboard')} className="btn btn-primary">Analysis Dashboard</button>
                     <button onClick={() => openModal()} className="btn btn-success">+ Add New</button>
                     <button onClick={() => navigate('/session-explorer')} className="btn btn-primary">Session Explorer</button>

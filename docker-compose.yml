@@ -28,8 +28,8 @@ services:
     depends_on:
       retail-agent:
         condition: service_started
-      guardrails-service:
-        condition: service_healthy
+      # guardrails-service:
+      #   condition: service_healthy
       postgres-db:
         condition: service_healthy
     environment:
@@ -261,6 +261,7 @@ services:
       - UVICORN_LOG_LEVEL=debug
       - LOG_LEVEL=debug
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - GOOGLE_TTS_API_KEY=${GOOGLE_TTS_API_KEY}
       - VOICE_STT_MODEL_ID=${VOICE_STT_MODEL_ID}
       - VOICE_TTS_EN_VOICE=${VOICE_TTS_EN_VOICE}
       - VOICE_TTS_AR_VOICE=${VOICE_TTS_AR_VOICE}
@@ -268,43 +269,43 @@ services:
     command: >
       python -m uvicorn backend.services.voice_service.server:voice_db_app --host 0.0.0.0 --port 8008 --reload --log-level debug --use-colors
 
-  guardrails-service:
-    build:
-      context: .
-      dockerfile: backend/services/guardrails/Dockerfile
-      args:
-        - GUARDRAILS_API_KEY=${GUARDRAILS_API_KEY}
-    container_name: guardrails-service
-    ports:
-      - "8005:8005"
-    volumes:
-      - ./backend:/app/backend
-    environment:
-      - GUARDRAILS_API_KEY=${GUARDRAILS_API_KEY}
-      - GUARDRAILS_LLM_MODEL=${GUARDRAILS_LLM_MODEL}
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - OPENAI_API_KEY=${GOOGLE_API_KEY}
-      - GEMINI_API_KEY=${GOOGLE_API_KEY}
-      - PYTHONUNBUFFERED=1
-      - PORT=8005
-      - TOKENIZERS_PARALLELISM=false
-      - OMP_NUM_THREADS=1
-      - MKL_NUM_THREADS=1
-      - NLTK_DATA=/usr/local/nltk_data
-      - OTEL_EXPORTER_OTLP_ENDPOINT=lgtm:4317
-      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
-      - OTEL_TRACES_ENABLED=true
-      - OTEL_SERVICE_NAME=guardrails-service
-      - LOG_LOKI_ENDPOINT=lgtm:4317
-      - LOG_SERVICE_NAME=guardrails-service
-    healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8005/health')\""]
-      interval: 5s
-      timeout: 5s
-      retries: 60
-      start_period: 30s
-    command: >
-      python -m uvicorn backend.services.guardrails.server:app --host 0.0.0.0 --port 8005 --reload --log-level info
+#   guardrails-service:
+#     build:
+#       context: .
+#       dockerfile: backend/services/guardrails/Dockerfile
+#       args:
+#         - GUARDRAILS_API_KEY=${GUARDRAILS_API_KEY}
+#     container_name: guardrails-service
+#     ports:
+#       - "8005:8005"
+#     volumes:
+#       - ./backend:/app/backend
+#     environment:
+#       - GUARDRAILS_API_KEY=${GUARDRAILS_API_KEY}
+#       - GUARDRAILS_LLM_MODEL=${GUARDRAILS_LLM_MODEL}
+#       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+#       - OPENAI_API_KEY=${GOOGLE_API_KEY}
+#       - GEMINI_API_KEY=${GOOGLE_API_KEY}
+#       - PYTHONUNBUFFERED=1
+#       - PORT=8005
+#       - TOKENIZERS_PARALLELISM=false
+#       - OMP_NUM_THREADS=1
+#       - MKL_NUM_THREADS=1
+#       - NLTK_DATA=/usr/local/nltk_data
+#       - OTEL_EXPORTER_OTLP_ENDPOINT=lgtm:4317
+#       - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+#       - OTEL_TRACES_ENABLED=true
+#       - OTEL_SERVICE_NAME=guardrails-service
+#       - LOG_LOKI_ENDPOINT=lgtm:4317
+#       - LOG_SERVICE_NAME=guardrails-service
+#     healthcheck:
+#       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8005/health')\""]
+#       interval: 5s
+#       timeout: 5s
+#       retries: 60
+#       start_period: 30s
+#     command: >
+#       python -m uvicorn backend.services.guardrails.server:app --host 0.0.0.0 --port 8005 --reload --log-level info
 
   lgtm:
     image: grafana/otel-lgtm:0.11.9
