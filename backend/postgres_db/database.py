@@ -2,7 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from .models import Base
-engine = create_engine("postgresql://finAI:finsecret@postgres-db:5432/finAI", pool_pre_ping=True)
+engine = create_engine("postgresql+psycopg2://finAI:finsecret@postgres-db:5432/finAI", pool_pre_ping=True)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 
