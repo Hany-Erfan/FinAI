@@ -20,7 +20,7 @@ from observability import setup_telemetry, setup_logging, instrument_app
 
 
 # Set Google API key explicitly
-os.environ["GOOGLE_API_KEY"] = os.getenv('GOOGLE_API_KEY', "***REMOVED***")
+os.environ["GOOGLE_API_KEY"] = os.getenv('GOOGLE_API_KEY', "")
 
 
 def build_faq_app():

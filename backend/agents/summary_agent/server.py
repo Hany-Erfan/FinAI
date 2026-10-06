@@ -18,7 +18,7 @@ from starlette.middleware.cors import CORSMiddleware
 from backend.agents.summary_agent.routes.summary_health import get_summary_health
 
 # Set Google API key explicitly
-os.environ["GOOGLE_API_KEY"] = os.getenv('GOOGLE_API_KEY', "***REMOVED***")
+os.environ["GOOGLE_API_KEY"] = os.getenv('GOOGLE_API_KEY', "")
 
 
 def build_summary_app():
