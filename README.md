@@ -183,3 +183,9 @@ make upload-dashboard
 
 This project is licensed under the MIT License. For security disclosures or issues, please contact the security team.
 
+
+## Credits
+
+Project lead, architecture, and agent orchestration: Hany Erfan.
+
+Built with contributions from Samuel Youssif, Nadine Tarek, Lamees Mohee, Samer Abaza, Ahmed Hammad, and Kareem Hashem, under his direction.
