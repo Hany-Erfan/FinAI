@@ -62,7 +62,7 @@ async def retrieve_product_info(user_query:str) -> str:
     data = await get_vector_db_response(endpoint, params={'user_query': user_query})
 
     if data is None:
-        return '❌ Failed to retrieve product information.'
+        return ' Failed to retrieve product information.'
 
     return data
 

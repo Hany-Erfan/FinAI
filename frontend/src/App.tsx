@@ -11,7 +11,7 @@ import { getCurrentUser, login } from './api/login';
 import { logout, summary } from './api/logout';
 
 const TAB_SESSION_KEY = "chat_tab_session_id";
-// ⚠️ INACTIVITY_TIMEOUT_MS must always be less than the server-side session TTL.
+// INACTIVITY_TIMEOUT_MS must always be less than the server-side session TTL.
 // If you change this value, update the backend session expiry accordingly. 
 // Add a 1 minute buffer in the backend (auth_config.py) for the summary to be executed
 const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;

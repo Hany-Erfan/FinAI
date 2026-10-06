@@ -179,7 +179,7 @@ async def get_response_from_agent(message: str, user_id: str, session_id: str) -
     for attempt in range(max_retries + 1):
         attempt_start = time.time()
         try:
-            logger.info(f"[AGENT ⏱️ ] ▶ Starting agent run (attempt {attempt + 1}/{max_retries + 1})")
+            logger.info(f"[AGENT ] ▶ Starting agent run (attempt {attempt + 1}/{max_retries + 1})")
             event_iterator = ROUTING_AGENT_RUNNER.run_async(
                 user_id=user_id,
                 session_id=session_id,
@@ -201,7 +201,7 @@ async def get_response_from_agent(message: str, user_id: str, session_id: str) -
 
                 if t_first_event is None:
                     t_first_event = now
-                    logger.info(f"[AGENT ⏱️ ]   ├─ First event at +{now - attempt_start:.2f}s")
+                    logger.info(f"[AGENT ] ├─ First event at +{now - attempt_start:.2f}s")
 
                 log_tool_calls_and_responses(event)
 
@@ -213,7 +213,7 @@ async def get_response_from_agent(message: str, user_id: str, session_id: str) -
                             fn_name = part.function_call.name
                             fn_args = getattr(part.function_call, "args", {}) or {}
                             current_target = fn_args.get("agent_name", "")
-                            logger.info(f"[AGENT ⏱️ ]   ├─ Tool call '{fn_name}' at +{now - attempt_start:.2f}s" + (f" → '{current_target}'" if current_target else ""))
+                            logger.info(f"[AGENT ] ├─ Tool call '{fn_name}' at +{now - attempt_start:.2f}s" + (f" → '{current_target}'" if current_target else ""))
                         if getattr(part, "function_response", None):
                             t_tool_response = now
                             fn_name = part.function_response.name
@@ -221,7 +221,7 @@ async def get_response_from_agent(message: str, user_id: str, session_id: str) -
                             if current_target:
                                 tool_durations[current_target] = dur
                             a2a_dur = f" (sub-agent took {dur:.2f}s)" if t_routing_call else ""
-                            logger.info(f"[AGENT ⏱️ ]   ├─ Tool response '{fn_name}' at +{now - attempt_start:.2f}s{a2a_dur}")
+                            logger.info(f"[AGENT ] ├─ Tool response '{fn_name}' at +{now - attempt_start:.2f}s{a2a_dur}")
                             
                             # Track last tool response for fallback
                             resp = part.function_response.response
@@ -243,17 +243,17 @@ async def get_response_from_agent(message: str, user_id: str, session_id: str) -
                             f"Agent escalated: {getattr(event, 'error_message', None) or 'No specific message.'}"
                         )
                     post_tool = f" (Gemini rewrite took {now - t_tool_response:.2f}s)" if t_tool_response else ""
-                    logger.info(f"[AGENT ⏱️ ]   ├─ Final response at +{now - attempt_start:.2f}s{post_tool}")
+                    logger.info(f"[AGENT ] ├─ Final response at +{now - attempt_start:.2f}s{post_tool}")
                     # DON'T break; consume rest of stream (reference behavior)
 
             total_attempt = time.time() - attempt_start
             attempt_durations.append(total_attempt)
-            logger.info(f"[AGENT ⏱️ ] └─ Agent run completed in {total_attempt:.2f}s ({event_count} events)")
+            logger.info(f"[AGENT ] └─ Agent run completed in {total_attempt:.2f}s ({event_count} events)")
             
             final_txt = final_response_text
             if not final_txt:
                 if last_tool_response:
-                    logger.warning("[AGENT ⏱️ ] Gemini returned empty text; falling back to last tool response.")
+                    logger.warning("[AGENT ] Gemini returned empty text; falling back to last tool response.")
                     final_txt = last_tool_response
                 else:
                     final_txt = "I'm sorry, I couldn't process your request at this time (no response from agent)."
@@ -269,7 +269,7 @@ async def get_response_from_agent(message: str, user_id: str, session_id: str) -
             if is_503 and attempt < max_retries:
                 import asyncio
                 delay = min(base_delay * (2 ** attempt), 10)
-                logger.warning(f"[AGENT ⏱️ ]   ├─ ⚠️ 503 UNAVAILABLE after {attempt_dur:.2f}s — retrying in {delay}s (attempt {attempt + 1}/{max_retries})")
+                logger.warning(f"[AGENT ] ├─ 503 UNAVAILABLE after {attempt_dur:.2f}s — retrying in {delay}s (attempt {attempt + 1}/{max_retries})")
                 await asyncio.sleep(delay)
                 continue
                 
@@ -431,7 +431,7 @@ async def chat_endpoint(
                         content=response,
             )
             
-            logger.warning(f"[FIN-AI 🛑] Request BLOCKED by Input Guardrails in {t_input:.2f}s")
+            logger.warning(f"[FIN-AI ] Request BLOCKED by Input Guardrails in {t_input:.2f}s")
             return ChatResponse(
                 response=response,
                 status="completed",
@@ -489,26 +489,26 @@ async def chat_endpoint(
         longest_step = max(durations, key=durations.get)
         
         logger.info(f"\n" + "="*50)
-        logger.info(f"[FIN-AI ✨] REQUEST PERFORMANCE SUMMARY")
-        logger.info(f"  ├─ 🎭 PII Masking:  {t_mask:.2f}s")
-        logger.info(f"  ├─ 🛡️ Input Check:  {t_input:.2f}s")
+        logger.info(f"[FIN-AI ] REQUEST PERFORMANCE SUMMARY")
+        logger.info(f" ├─ PII Masking: {t_mask:.2f}s")
+        logger.info(f" ├─ Input Check: {t_input:.2f}s")
         for step, dur in input_durations.items():
             logger.info(f"  │  ├─ {step.capitalize()}: {dur:.2f}s")
-        logger.info(f"  ├─ 🧠 Agent Logic:  {t_agent:.2f}s")
+        logger.info(f" ├─ Agent Logic: {t_agent:.2f}s")
         if len(all_attempts) > 1:
             logger.info(f"  │  ├─ Attempts:   {len(all_attempts)} calls")
             for i, dur in enumerate(all_attempts):
                 logger.info(f"  │  │  └── Try {i+1}: {dur:.2f}s")
         for ag, dur in agent_durations.items():
-            logger.info(f"  │  ├─ 🤖 {ag}: {dur:.2f}s")
+            logger.info(f" │ ├─ {ag}: {dur:.2f}s")
             ag_atts = sub_attempts.get(ag, [])
             if len(ag_atts) > 1:
                 for i, d in enumerate(ag_atts):
                     logger.info(f"  │  │  └── Try {i+1}: {d:.2f}s")
-        logger.info(f"  ├─ 🛡️ Output Check: {t_output:.2f}s")
+        logger.info(f" ├─ Output Check: {t_output:.2f}s")
         for step, dur in output_durations.items():
             logger.info(f"  │  ├─ {step.capitalize()}: {dur:.2f}s")
-        logger.info(f"  └─ 🏁 TOTAL TIME:   {total_time:.2f}s")
+        logger.info(f" └─ TOTAL TIME: {total_time:.2f}s")
         logger.info(f"  [!] Longest Step: {longest_step} ({durations[longest_step]:.2f}s)")
         logger.info("="*50 + "\n")
 
@@ -560,7 +560,7 @@ async def voice_chat_endpoint(
         pipeline_start = time.time()
 
         # 1) Speech-to-Text: Convert audio to text
-        logger.info(f"[VOICE ⏱️ ] ▶ STEP 1: Speech-to-Text starting...")
+        logger.info(f"[VOICE ] ▶ STEP 1: Speech-to-Text starting...")
         t0 = time.time()
         async with httpx.AsyncClient(timeout=120.0) as client:
             stt_response = await client.post(
@@ -571,7 +571,7 @@ async def voice_chat_endpoint(
             stt_data = stt_response.json()
             user_message = stt_data.get("text")
         stt_dur = time.time() - t0
-        logger.info(f"[VOICE ⏱️ ] ✅ STEP 1: STT completed in {stt_dur:.2f}s — Transcription: '{user_message}'")
+        logger.info(f"[VOICE ] STEP 1: STT completed in {stt_dur:.2f}s — Transcription: '{user_message}'")
 
         if not user_message:
             # If transcription is empty but succeeded (silence), we can just return early or log it.
@@ -582,7 +582,7 @@ async def voice_chat_endpoint(
             )
 
         # 2) Ensure session exists in DB and ADK memory
-        logger.info(f"[VOICE ⏱️ ] ▶ STEP 2: Session setup starting...")
+        logger.info(f"[VOICE ] ▶ STEP 2: Session setup starting...")
         t0 = time.time()
         repo.create_session(
             user_id=current_user["user_id"],
@@ -622,7 +622,7 @@ async def voice_chat_endpoint(
             except Exception as exc:
                 logger.warning(f"[VOICE-DEBUG] Failed to append session state: {exc}")
         session_dur = time.time() - t0
-        logger.info(f"[VOICE ⏱️ ] ✅ STEP 2: Session setup completed in {session_dur:.2f}s")
+        logger.info(f"[VOICE ] STEP 2: Session setup completed in {session_dur:.2f}s")
 
         # 3) Process with Agent
         
@@ -641,16 +641,16 @@ async def voice_chat_endpoint(
         augmented_message = user_message + voice_instruction
 
         # Get agent response
-        logger.info(f"[VOICE ⏱️ ] ▶ STEP 3: Agent processing starting...")
+        logger.info(f"[VOICE ] ▶ STEP 3: Agent processing starting...")
         t0 = time.time()
         response_text, _, _ = await get_response_from_agent(
             augmented_message, user_id=current_user["user_id"], session_id=session_id
         )
         agent_dur = time.time() - t0
-        logger.info(f"[VOICE ⏱️ ] ✅ STEP 3: Agent processing completed in {agent_dur:.2f}s")
+        logger.info(f"[VOICE ] STEP 3: Agent processing completed in {agent_dur:.2f}s")
 
         # 4) Text-to-Speech: Convert response to audio
-        logger.info(f"[VOICE ⏱️ ] ▶ STEP 4: TTS starting... ({len(response_text)} chars)")
+        logger.info(f"[VOICE ] ▶ STEP 4: TTS starting... ({len(response_text)} chars)")
         t0 = time.time()
         lang_code = detect_language(response_text)
         async with httpx.AsyncClient(timeout=120.0) as client:
@@ -662,7 +662,7 @@ async def voice_chat_endpoint(
             tts_data = tts_response.json()
             audio_base64 = tts_data.get("audio_base64")
         tts_dur = time.time() - t0
-        logger.info(f"[VOICE ⏱️ ] ✅ STEP 4: TTS completed in {tts_dur:.2f}s")
+        logger.info(f"[VOICE ] STEP 4: TTS completed in {tts_dur:.2f}s")
 
         # Log agent response
         repo.save_message(
@@ -673,14 +673,14 @@ async def voice_chat_endpoint(
 
         # Pipeline summary
         total = time.time() - pipeline_start
-        logger.info(f"[VOICE ⏱️ ] ┌──────────────────────────────────────────────────┐")
-        logger.info(f"[VOICE ⏱️ ] │  PIPELINE SUMMARY — session {session_id[:8]}...")
-        logger.info(f"[VOICE ⏱️ ] │  1. STT:     {stt_dur:>6.2f}s  ({stt_dur/total*100:>5.1f}%)")
-        logger.info(f"[VOICE ⏱️ ] │  2. Session: {session_dur:>6.2f}s  ({session_dur/total*100:>5.1f}%)")
-        logger.info(f"[VOICE ⏱️ ] │  3. Agent:   {agent_dur:>6.2f}s  ({agent_dur/total*100:>5.1f}%)")
-        logger.info(f"[VOICE ⏱️ ] │  4. TTS:     {tts_dur:>6.2f}s  ({tts_dur/total*100:>5.1f}%)")
-        logger.info(f"[VOICE ⏱️ ] │  TOTAL:      {total:>6.2f}s")
-        logger.info(f"[VOICE ⏱️ ] └──────────────────────────────────────────────────┘")
+        logger.info(f"[VOICE ] ┌──────────────────────────────────────────────────┐")
+        logger.info(f"[VOICE ] │ PIPELINE SUMMARY — session {session_id[:8]}...")
+        logger.info(f"[VOICE ] │ 1. STT: {stt_dur:>6.2f}s ({stt_dur/total*100:>5.1f}%)")
+        logger.info(f"[VOICE ] │ 2. Session: {session_dur:>6.2f}s ({session_dur/total*100:>5.1f}%)")
+        logger.info(f"[VOICE ] │ 3. Agent: {agent_dur:>6.2f}s ({agent_dur/total*100:>5.1f}%)")
+        logger.info(f"[VOICE ] │ 4. TTS: {tts_dur:>6.2f}s ({tts_dur/total*100:>5.1f}%)")
+        logger.info(f"[VOICE ] │ TOTAL: {total:>6.2f}s")
+        logger.info(f"[VOICE ] └──────────────────────────────────────────────────┘")
 
         return VoiceChatResponse(
             user_message=user_message,

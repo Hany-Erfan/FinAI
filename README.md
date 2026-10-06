@@ -4,7 +4,7 @@ FinAI is a state-of-the-art, multi-agent AI banking platform designed to provide
 
 ---
 
-## 🚀 Key Features
+## Key Features
 
 *   **Premium Voice Interaction**: 
     *   **Speech-to-Text (STT)**: Real-time transcription using Gemini-powered audio processing.
@@ -20,7 +20,7 @@ FinAI is a state-of-the-art, multi-agent AI banking platform designed to provide
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 ### High-Level Request Flow
 
@@ -86,7 +86,7 @@ sequenceDiagram
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 *   **Frontend**: React, Vite, TypeScript, TailwindCSS.
 *   **Backend**: Python, FastAPI, LangChain, Pydantic.
@@ -98,7 +98,7 @@ sequenceDiagram
 
 ---
 
-## 💻 Getting Started (Local Development)
+## Getting Started (Local Development)
 
 ### Prerequisites
 - Docker & Docker Compose
@@ -136,10 +136,10 @@ sequenceDiagram
     - **Host Agent API**: `http://localhost:8000`
     - **Grafana**: `http://localhost:3000`
 
-### ⚡ Development Productivity
+### Development Productivity
 The backend services (Host Agent, FAQ Agent, Guardrails Service) are configured with **Hot Reload** enabled in Docker. Any changes made to the Python code in the `backend/` directory will be reflected immediately without needing to restart the containers.
 
-### 📊 Advanced Performance Monitoring
+### Advanced Performance Monitoring
 The Host Agent now provides a detailed **REQUEST PERFORMANCE SUMMARY** in the logs for every interaction. This includes:
 - **PII Masking & Guardrails**: Time spent on pre-processing and safety checks.
 - **Host Agent Retries**: History of retries for the main routing logic (max 20 attempts).
@@ -149,7 +149,7 @@ The Host Agent now provides a detailed **REQUEST PERFORMANCE SUMMARY** in the lo
 
 ---
 
-## 🧪 Testing
+## Testing
 
 Integration, auth, and UI tests live in `tests/` and run against the local stack:
 
@@ -163,7 +163,7 @@ The same suite runs in CI (GitHub Actions) on every push and pull request to `ma
 
 ---
 
-## 🚢 Deployment (Production)
+## Deployment (Production)
 
 The platform is optimized for **GKE Autopilot**.
 
@@ -175,11 +175,11 @@ The platform is optimized for **GKE Autopilot**.
 
 2.  **Detailed Guide**:
     For comprehensive deployment instructions, infrastructure details, and troubleshooting, please refer to the:
-    👉 **[DEPLOYMENT.README.md](./DEPLOYMENT.README.md)**
+     **[DEPLOYMENT.README.md](./DEPLOYMENT.README.md)**
 
 ---
 
-## 📊 Observability & Metrics
+## Observability & Metrics
 
 FinAI uses **OpenTelemetry** for full-stack visibility.
 - **Traces**: View the exact path of a message across all sub-agents in Grafana Tempo.
@@ -193,7 +193,7 @@ make upload-dashboard
 
 ---
 
-## 🛡️ License & Security
+## License & Security
 
 This project is licensed under the MIT License. For security disclosures or issues, please contact the security team.
 

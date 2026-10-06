@@ -32,7 +32,7 @@ def save_summaries(session_id: str, transcript: SummaryPayload) -> str:
     data = save_summary_response(endpoint, transcript)
 
     if data is None:
-        return f'❌ Failed to save the summary. Please check the Session ID and try again.'
+        return f' Failed to save the summary. Please check the Session ID and try again.'
 
     return data 
 

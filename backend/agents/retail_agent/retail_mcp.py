@@ -70,7 +70,7 @@ async def get_balance(user_id: str) -> str:
     data = await get_bank_response(endpoint)
 
     if data is None:
-        return f'❌ Failed to retrieve balance for user {user_id}. Please check the user ID and try again.'
+        return f' Failed to retrieve balance for user {user_id}. Please check the user ID and try again.'
 
     return data 
 
@@ -90,7 +90,7 @@ async def get_accounts(user_id: str) -> str:
     data = await get_bank_response(endpoint)
 
     if data is None:
-        return f'❌ Failed to retrieve accounts for user {user_id}. Please check the user ID and try again.'
+        return f' Failed to retrieve accounts for user {user_id}. Please check the user ID and try again.'
 
     return data
 
@@ -114,7 +114,7 @@ async def get_transactions(user_id: str, limit: int = 10) -> str:
     data = await get_bank_response(endpoint, params=params)
 
     if data is None:
-        return f'❌ Failed to retrieve transactions for user {user_id}. Please check the user ID and try again.'
+        return f' Failed to retrieve transactions for user {user_id}. Please check the user ID and try again.'
 
     return data
 

@@ -236,7 +236,7 @@ const ChatPage = ({ auth, onLogout, sessionId, inactivityTimeout }) => {
     if (isLoading) return;
 
     const userMessage: Message = {
-      text: "🎤 Voice message...",
+      text: " Voice message...",
       sender: 'user',
       timestamp: new Date().toISOString(),
     };
@@ -264,7 +264,7 @@ const ChatPage = ({ auth, onLogout, sessionId, inactivityTimeout }) => {
         if (s.id === currentSessionId) {
           const newMessages = [...s.messages];
           if (transcription) {
-            newMessages[newMessages.length - 1].text = `🎤 ${transcription}`;
+            newMessages[newMessages.length - 1].text = ` ${transcription}`;
           }
           if (reply) {
             newMessages.push({ text: reply, sender: 'agent', timestamp: new Date().toISOString() });
@@ -386,7 +386,7 @@ const ChatPage = ({ auth, onLogout, sessionId, inactivityTimeout }) => {
             <div id="session-popover" className="session-popover">
               <div className="session-popover-arrow" />
               <strong style={{ color: "#111827", display: "block", marginBottom: "4px" }}>
-                ⚠️ Auto logout enabled
+                 Auto logout enabled
               </strong>
               For your security, your session will automatically expire after{" "}
               <strong>{INACTIVITY_MINUTES} minutes</strong> of inactivity.

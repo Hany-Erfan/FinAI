@@ -684,7 +684,7 @@ class RoutingAgent:
                      subagent_attempts = getattr(task_result.root, "metadata", {}).get("attempts", [])
 
                 if subagent_attempts:
-                    logger.info(f"[AGENT ⏱️ ]   │  └── Sub-agent made {len(subagent_attempts)} attempt(s): {', '.join([f'{d:.2f}s' for d in subagent_attempts])}")
+                    logger.info(f"[AGENT ] │ └── Sub-agent made {len(subagent_attempts)} attempt(s): {', '.join([f'{d:.2f}s' for d in subagent_attempts])}")
                     # Store in ContextVar so main.py summary can pick it up
                     current = SUBAGENT_ATTEMPTS.get()
                     current[agent_name] = subagent_attempts
