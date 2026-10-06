@@ -1,5 +1,7 @@
 # FinAI: Multi-Agent AI Banking platform
 
+[![CI](https://github.com/Hany-Erfan/FinAI/actions/workflows/ci.yml/badge.svg)](https://github.com/Hany-Erfan/FinAI/actions/workflows/ci.yml)
+
 FinAI is a state-of-the-art, multi-agent AI banking platform designed to provide a seamless, secure, and intelligent customer support experience. Built with a modular microservices architecture, it leverages specialized AI agents to handle diverse banking tasks—from general inquiries to complex retail banking transactions.
 
 ---
