@@ -149,6 +149,20 @@ The backend services (Host Agent, FAQ Agent, Guardrails Service) are configured 
 
 ---
 
+## 🧪 Testing
+
+Integration, auth, and UI tests live in `tests/` and run against the local stack:
+
+```bash
+make up                               # start all services
+pip install -r tests/requirements.txt
+pytest tests/ -v                      # full suite, or target a file, e.g. tests/test_integration.py
+```
+
+The same suite runs in CI (GitHub Actions) on every push and pull request to `main`.
+
+---
+
 ## 🚢 Deployment (Production)
 
 The platform is optimized for **GKE Autopilot**.
